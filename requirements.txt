@@ -1,0 +1,29 @@
+# Kafka
+kafka-python==2.2.15
+
+# Redis
+redis==6.0.0
+
+# PostgreSQL
+psycopg2-binary==2.9.10
+
+# FastAPI
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+
+# Validation
+pydantic==2.11.4
+
+# Environment
+python-dotenv==1.1.0
+
+# Telegram
+telethon==1.40.0
+
+# Scraping
+requests==2.32.3
+beautifulsoup4==4.13.4
+lxml==5.4.0
+
+# Optional async kafka (future)
+# aiokafka==0.12.0

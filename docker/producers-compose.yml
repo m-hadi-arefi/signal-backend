@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+
+  telegram-producer:
+    build: 
+      context: . 
+      dockerfile: Dockerfile
+    command: python services/producers/telegram/main.py
+    restart: always
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+    networks:
+      - event-net
+
+  scraper-producer:
+    build: 
+      context: . 
+      dockerfile: Dockerfile
+    command: python services/producers/scraper/main.py
+    restart: always
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+    networks:
+      - event-net
+
+  http-api-producer:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: python services/producers/http_api/main.py
+    restart: always
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+    networks:
+      - event-net
+
+networks:
+  event-net:
+    external: true

@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: events
+    ports:
+      - "5432:5432"
+    networks:
+      - event-net
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - event-net
+
+networks:
+  event-net:
+    driver: bridge

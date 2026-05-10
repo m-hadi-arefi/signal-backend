@@ -1,0 +1,1 @@
+SOURCES = [ "https://example.com", "https://example.org" ]

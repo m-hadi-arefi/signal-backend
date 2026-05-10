@@ -1,0 +1,79 @@
+services:
+  engine:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: python services/engine/main.py
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+    networks:
+      - event-net
+
+  html-worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: python services/workers/html_cleaner/main.py
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+    networks:
+      - event-net
+
+  ai-worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: python services/workers/ai_worker/main.py
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+    networks:
+      - event-net
+
+  serializer:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: python services/workers/serializer/main.py
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+    networks:
+      - event-net
+
+  final-store:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    command: python services/workers/final_store/main.py
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+    networks:
+      - event-net
+
+networks:
+  event-net:
+    external: true

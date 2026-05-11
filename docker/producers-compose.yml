@@ -6,7 +6,7 @@ services:
     build: 
       context: . 
       dockerfile: Dockerfile
-    command: python services/producers/telegram/main.py
+    command: sh -c "sleep 10 && watchfiles 'python services/producers/telegram/main.py'"
     restart: always
 
     depends_on:
@@ -18,12 +18,14 @@ services:
         condition: service_started
     networks:
       - event-net
+    volumes:
+      - .:/app
 
   scraper-producer:
     build: 
       context: . 
       dockerfile: Dockerfile
-    command: python services/producers/scraper/main.py
+    command: sh -c "sleep 10 && watchfiles 'python services/producers/scraper/main.py'"
     restart: always
 
     depends_on:
@@ -35,12 +37,14 @@ services:
         condition: service_started
     networks:
       - event-net
+    volumes:
+      - .:/app
 
   http-api-producer:
     build: 
       context: .
       dockerfile: Dockerfile
-    command: python services/producers/http_api/main.py
+    command: sh -c "sleep 10 && watchfiles 'python services/producers/http_api/main.py'"
     restart: always
 
     depends_on:
@@ -52,6 +56,8 @@ services:
         condition: service_started
     networks:
       - event-net
+    volumes:
+      - .:/app
 
 networks:
   event-net:

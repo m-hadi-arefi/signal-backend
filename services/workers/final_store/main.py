@@ -1,60 +1,81 @@
-from core.kafka import get_consumer, get_producer
-from core.retry import can_retry, increase_retry
-from core.db import get_connection
-from core.trace import ensure_trace
-from core.dlq import send_to_dlq
+import asyncio
+
+from services.workers.final_store.consumer import create_consumer
+from services.workers.final_store.repository import EventRepository
+from services.workers.final_store.processor import EventProcessor
+from core.config import settings
 from core.logger import log
-import json
-from core.heartbeat import beat
-from core.lag import get_lag
-from shared.schema import Event
-import time
+from core.kafka_client import safe_commit
+from core.kafka_client import start_consumer_with_stability
 
-consumer = get_consumer("final-events", "final-group")
-producer = get_producer()
-SERVICE = "final_worker"
 
-conn = get_connection()
-cur = conn.cursor()
+processor = EventProcessor()
+repo = EventRepository()
 
-for msg in consumer:
-    print("lag:", get_lag(consumer))
-    beat(SERVICE)
-    event = Event(**msg.value).model_dump()
-    event = ensure_trace(event)
+
+# -------------------------
+# handle event
+# -------------------------
+async def handle_event(msg, consumer):
+
+    event = msg.value
 
     try:
-        cur.execute(
-            "INSERT INTO events (data) VALUES (%s)",
-            (json.dumps(event),)
-        )
+        clean_event = processor.process(event)
+        repo.upsert_event(clean_event)
+        repo.db.commit()
         log(
-            service=SERVICE,
-            level="info",
-            trace_id=event["trace_id"],
-            step="final",
-            event=event
+            "final_store",
+            "info",
+            clean_event.get("trace_id"),
+            "saved successfully",
+            clean_event
         )
-
-        conn.commit()
-        consumer.commit()
+        await safe_commit(consumer)
 
     except Exception as e:
-        log(
-            service=SERVICE,
-            level="error",
-            trace_id=event.get("trace_id"),
-            step="final",
-            event=event,
-            error=e
-        )
-        if can_retry(event):
-            event = increase_retry(event)
-            producer.send("final-events", {
-                **event,
-                "retry_at": time.time() + 5
-            })
-        else:
-            send_to_dlq(event, e, "final_store")
 
-        consumer.commit()
+        try:
+            repo.db.rollback()
+        except:
+            pass
+
+        log(
+            "final_store",
+            "error",
+            event.get("trace_id"),
+            "failed to store event",
+            event,
+            error=str(e)
+        )
+
+
+# -------------------------
+# main loop
+# -------------------------
+async def run():
+    print("[final-store] started")
+
+    consumer = create_consumer()
+
+    await start_consumer_with_stability(consumer)
+
+    try:
+
+        async for msg in consumer:
+            await handle_event(msg, consumer)
+            
+    except asyncio.CancelledError:
+        print("[SHUTDOWN] cancelled")
+
+    finally:
+
+        await consumer.stop()
+        repo.close()
+
+
+# -------------------------
+# entrypoint
+# -------------------------
+if __name__ == "__main__":
+    asyncio.run(run())

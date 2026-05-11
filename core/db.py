@@ -7,6 +7,10 @@ import time
 def get_connection(retries=5, delay=2):
     for i in range(retries):
         try:
+            print(f"settiing POSTGRES_DB :  {settings.POSTGRES_DB}")
+            print(f"settiing POSTGRES_USER :  {settings.POSTGRES_USER}")
+            print(f"settiing POSTGRES_PASSWORD :  {settings.POSTGRES_PASSWORD}")
+            print(f"settiing POSTGRES_HOST :  {settings.POSTGRES_HOST}")
             return psycopg2.connect(
                 dbname=settings.POSTGRES_DB,
                 user=settings.POSTGRES_USER,

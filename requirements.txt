@@ -27,3 +27,15 @@ lxml==5.4.0
 
 # Optional async kafka (future)
 # aiokafka==0.12.0
+
+# ORM
+sqlalchemy>=2.0.0
+
+# Migrations
+alembic>=1.13.0
+
+# async kafka
+aiokafka==0.14.0
+
+# Dev mode
+watchfiles==1.1.1

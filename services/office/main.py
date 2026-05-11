@@ -13,8 +13,8 @@ def health(service: str):
 
 
 @app.post("/replay")
-def replay(event: dict):
-    replay_event(event)
+async def replay(event: dict):
+    await replay_event(event)
     return {"status": "replayed"}
 
 

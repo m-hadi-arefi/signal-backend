@@ -9,6 +9,13 @@ services:
       - "5432:5432"
     networks:
       - event-net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -20,3 +27,6 @@ services:
 networks:
   event-net:
     driver: bridge
+
+volumes:
+  postgres_data:

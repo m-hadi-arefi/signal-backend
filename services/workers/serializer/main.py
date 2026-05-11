@@ -1,58 +1,108 @@
-from core.kafka import get_consumer, get_producer
-from core.dlq import send_to_dlq
-from core.retry import can_retry, increase_retry, retry_delay
-from core.trace import ensure_trace, add_step
-from core.logger import log
+import asyncio
 import json
-from core.lag import get_lag
-from shared.schema import Event
-from core.heartbeat import beat
-import time
 
-consumer = get_consumer("serialize-events", "serializer-group")
-producer = get_producer()
+from core.kafka_client import (
+    get_consumer,
+    get_producer,
+    safe_commit
+)
+
+from core.logger import log
+from core.kafka_client import start_consumer_with_stability
 
 
-SERVICE = "serialize_worker"
+# -------------------------
+# process message
+# -------------------------
+async def handle_message(
+    msg,
+    consumer,
+    producer
+):
 
-for msg in consumer:
-    print("lag:", get_lag(consumer))
-    beat(SERVICE)
-    event = Event(**msg.value).model_dump()
-    event = ensure_trace(event)
+    event = msg.value
 
     try:
-        event["json"] = json.dumps(event)
+
+        if not isinstance(event, dict):
+            return
+
+        # ensure trace exists
+        event.setdefault("trace", [])
+
+        if "serialize" not in event["trace"]:
+            event["trace"].append("serialize")
+
+        # serialize full event
+        event["json"] = json.dumps(
+            event,
+            default=str
+        )
+
         log(
-            service=SERVICE,
+            service="serialize",
             level="info",
-            trace_id=event["trace_id"],
+            trace_id=event.get("trace_id"),
             step="serialize",
             event=event
         )
-        event = add_step(event, "serialize")
-        producer.send("engine-events", event)
-        producer.flush()
-        consumer.commit()
+
+        # return to engine
+        await producer.send_and_wait(
+            "engine-events",
+            event
+        )
+
+        # commit ONLY after success
+        await safe_commit(consumer)
 
     except Exception as e:
+
         log(
-            service=SERVICE,
+            service="serialize",
             level="error",
             trace_id=event.get("trace_id"),
             step="serialize",
             event=event,
-            error=e
+            error=str(e)
         )
 
-        if can_retry(event):
-            event = increase_retry(event)
-            retry_delay()
-            producer.send("serialize-events", {
-                **event,
-                "retry_at": time.time() + 5
-            })
-            producer.flush()
-        else:
-            send_to_dlq(event, e, "serializer")
-        consumer.commit()
+
+# -------------------------
+# main loop
+# -------------------------
+async def run():
+    print("[serialize-worker] started")
+
+
+    consumer = get_consumer(
+        "serialize-events",
+        "serialize-group"
+    )
+
+    producer = await get_producer()
+
+    await start_consumer_with_stability(consumer)
+
+    try:
+
+        async for msg in consumer:
+
+            await handle_message(
+                msg,
+                consumer,
+                producer
+            )
+    except asyncio.CancelledError:
+        print("[SHUTDOWN] cancelled")
+    finally:
+
+        await consumer.stop()
+        await producer.stop()
+
+
+# -------------------------
+# entrypoint
+# -------------------------
+if __name__ == "__main__":
+    asyncio.run(run())

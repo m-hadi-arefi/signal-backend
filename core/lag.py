@@ -1,4 +1,4 @@
-from kafka import KafkaConsumer
+from signal.core.kafka_client import KafkaConsumer
 
 def get_lag(consumer: KafkaConsumer):
     partitions = consumer.assignment()

@@ -1,86 +1,109 @@
-from core.kafka import get_consumer, get_producer
+import asyncio
+
+from core.kafka_client import (
+    get_consumer,
+    get_producer,
+    safe_commit
+)
 from core.logger import log
-from core.dlq import send_to_dlq
-from core.retry import can_retry, increase_retry, retry_delay
+from core.kafka_client import start_consumer_with_stability
 
-consumer = get_consumer("engine-events", "engine-group")
-producer = get_producer()
+# -------------------------
+# next step resolver
+# -------------------------
+def next_step(pipeline, trace):
+
+    if not pipeline:
+        return None
+
+    trace = trace or []
+
+    for step in pipeline:
+        if step not in trace:
+            return step
+
+    return None
 
 
-def get_next_topic(step: str) -> str:
-    return f"{step}-events"
+# -------------------------
+# dispatch
+# -------------------------
+async def dispatch(producer, event, step):
 
-
-for msg in consumer:
-    event = msg.value
-    trace_id = event.get("trace_id", "no-trace-id")
+    topic = f"{step}-events"
 
     log(
-        service="engine_worker",
+        service="engine",
         level="info",
-        trace_id=trace_id,
-        step="engine",
+        trace_id=event.get("trace_id"),
+        step=f"dispatch:{step}",
         event=event
     )
 
+    await producer.send_and_wait(
+        topic,
+        event
+    )
+
+
+# -------------------------
+# process
+# -------------------------
+async def process(producer, event):
+
     pipeline = event.get("pipeline", [])
-    if not pipeline:
-        log(
-            service="engine_worker",
-            level="warning",
-            trace_id=trace_id,
-            step="engine",
-            event="Pipeline empty"
-        )
-        consumer.commit()
-        continue
-
     trace = event.get("trace", [])
-    last_done = trace[-1] if trace else None
 
-    next_step = None
-    if last_done is None:
-        next_step = pipeline[0]
-    else:
-        try:
-            idx = pipeline.index(last_done)
-            if idx + 1 < len(pipeline):
-                next_step = pipeline[idx + 1]
-        except ValueError:
-            next_step = pipeline[0]
+    step = next_step(pipeline, trace)
 
-    if next_step:
-        try:
-            if next_step not in trace:
-                event["trace"] = trace + [next_step]
+    if step:
+        await dispatch(producer, event, step)
 
-            producer.send(get_next_topic(next_step), event)
-            producer.flush()
-            consumer.commit()
-
-        except Exception as e:
-            log(
-                service="engine_worker",
-                level="error",
-                trace_id=trace_id,
-                step="engine",
-                event=event,
-                error=e
-            )
-            if can_retry(event):
-                event = increase_retry(event)
-                retry_delay()
-                producer.send(get_next_topic(next_step), event)
-                producer.flush()
-            else:
-                send_to_dlq(event, e, "engine_worker")
-            consumer.commit()
     else:
         log(
-            service="engine_worker",
+            service="engine",
             level="info",
-            trace_id=trace_id,
-            step="engine",
-            event="Pipeline completed"
+            trace_id=event.get("trace_id"),
+            step="completed",
+            event=event
         )
-        consumer.commit()
+
+
+# -------------------------
+# main loop
+# -------------------------
+async def main():
+
+    consumer = get_consumer(
+        "engine-events",
+        "engine-group"
+    )
+
+    producer = await get_producer()
+
+    await start_consumer_with_stability(consumer)
+
+    try:
+        async for msg in consumer:
+
+            event = msg.value
+
+            if not isinstance(event, dict):
+                continue
+
+            pipeline = event.get("pipeline", [])
+            trace = event.get("trace", [])
+
+            for step in pipeline:
+                if step not in trace:
+                    topic = f"{step}-events"
+
+                    await producer.send_and_wait(topic, event)
+                    break
+
+    finally:
+        await consumer.stop()
+        await producer.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())

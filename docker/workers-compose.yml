@@ -3,7 +3,7 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    command: python services/engine/main.py
+    command:  sh -c "sleep 10 && watchfiles 'python services/engine/main.py'"
     depends_on:
       kafka:
         condition: service_healthy
@@ -13,12 +13,14 @@ services:
         condition: service_started
     networks:
       - event-net
+    volumes:
+      - .:/app
 
   html-worker:
     build: 
       context: .
       dockerfile: Dockerfile
-    command: python services/workers/html_cleaner/main.py
+    command:  sh -c "sleep 10 && watchfiles 'python services/workers/html_cleaner/main.py'"
     depends_on:
       kafka:
         condition: service_healthy
@@ -28,12 +30,14 @@ services:
         condition: service_started
     networks:
       - event-net
+    volumes:
+      - .:/app
 
   ai-worker:
     build: 
       context: .
       dockerfile: Dockerfile
-    command: python services/workers/ai_worker/main.py
+    command:  sh -c "sleep 10 && watchfiles 'python services/workers/ai_worker/main.py'"
     depends_on:
       kafka:
         condition: service_healthy
@@ -43,12 +47,14 @@ services:
         condition: service_started
     networks:
       - event-net
+    volumes:
+      - .:/app
 
   serializer:
     build: 
       context: .
       dockerfile: Dockerfile
-    command: python services/workers/serializer/main.py
+    command:  sh -c "sleep 10 && watchfiles 'python services/workers/serializer/main.py'"
     depends_on:
       kafka:
         condition: service_healthy
@@ -58,12 +64,14 @@ services:
         condition: service_started
     networks:
       - event-net
+    volumes:
+      - .:/app
 
   final-store:
     build: 
       context: .
       dockerfile: Dockerfile
-    command: python services/workers/final_store/main.py
+    command:  sh -c "sleep 10 && watchfiles 'python services/workers/final_store/main.py'"
     depends_on:
       kafka:
         condition: service_healthy
@@ -73,6 +81,8 @@ services:
         condition: service_started
     networks:
       - event-net
+    volumes:
+      - .:/app
 
 networks:
   event-net:

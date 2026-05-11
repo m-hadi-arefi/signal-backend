@@ -1,11 +1,22 @@
-from core.kafka import get_producer
-import json
-
-producer = get_producer()
+from core.kafka_client import get_producer
 
 
-def replay_event(event):
-    event["pipeline"] = ["html"]
+# -------------------------
+# replay event
+# -------------------------
+async def replay_event(event):
 
-    producer.send("html-events", event)
-    producer.flush()
+    producer = await get_producer()
+
+    try:
+
+        event["pipeline"] = ["html"]
+
+        await producer.send_and_wait(
+            "html-events",
+            event
+        )
+
+    finally:
+
+        await producer.stop()

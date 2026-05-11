@@ -1,60 +1,101 @@
-from core.retry import can_retry, increase_retry, retry_delay
-from core.kafka import get_consumer, get_producer
-from core.trace import ensure_trace, add_step
-from core.dlq import send_to_dlq
-from core.logger import log
-from core.heartbeat import beat
-from core.lag import get_lag
-from shared.schema import Event
-import time 
+import asyncio
 
-SERVICE = "ai_worker"
-consumer = get_consumer("ai-events", "ai-group")
-producer = get_producer()
+from core.kafka_client import (
+    get_consumer,
+    get_producer,
+    safe_commit
+)
+from core.config import settings
+from core.logger import log
+from core.kafka_client import start_consumer_with_stability
 
 
 def fake_ai(text):
-    return {"summary": text[:20]}
+    return {
+        "summary": text[:20] if text else ""
+    }
 
-for msg in consumer:
-    print("lag:", get_lag(consumer))
-    beat(SERVICE)
-    event = Event(**msg.value).model_dump()
-    event = ensure_trace(event)
+
+# -------------------------
+# process message
+# -------------------------
+async def handle_message(msg, consumer, producer):
+
+    event = msg.value
 
     try:
-        event["ai"] = fake_ai(event["text"])
-        log(
-            service=SERVICE,
-            level="info",
-            trace_id=event["trace_id"],
-            step="html",
-            event=event
-        )
-        event = add_step(event, "ai")
-        producer.send("engine-events", event)
-        producer.flush()
 
-        consumer.commit()
+        if not isinstance(event, dict):
+            return
 
-    except Exception as e:
+        event.setdefault("trace", [])
+
+        text = event.get("text", "")
+
+        # fake ai
+        event["ai"] = fake_ai(text)
+
+        if "ai" not in event["trace"]:
+            event["trace"].append("ai")
+
         log(
-            service=SERVICE,
+            service="ai_worker",
             level="info",
-            trace_id=event["trace_id"],
+            trace_id=event.get("trace_id"),
             step="ai",
             event=event
         )
-        if can_retry(event):
-            event = increase_retry(event)
-            retry_delay()
 
-            producer.send("ai-events", {
-                **event,
-                "retry_at": time.time() + 5
-            })
-            producer.flush()
-        else:
-            send_to_dlq(event, e, "ai_worker")
+        # return to engine
+        await producer.send_and_wait(
+            "engine-events",
+            event
+        )
 
-        consumer.commit()
+        # commit after success
+        await safe_commit(consumer)
+
+    except Exception as e:
+
+        log(
+            service="ai_worker",
+            level="error",
+            trace_id=event.get("trace_id"),
+            step="ai",
+            event=event,
+            error=str(e)
+        )
+
+
+# -------------------------
+# main loop
+# -------------------------
+async def run():
+    print("[ai-worker] started")
+    consumer = get_consumer(
+        "ai-events",
+        "ai-group"
+    )
+
+    producer = await get_producer()
+
+    await start_consumer_with_stability(consumer)
+
+    try:
+
+        async for msg in consumer:
+            await handle_message(
+                msg,
+                consumer,
+                producer
+            )
+
+    finally:
+        await consumer.stop()
+        await producer.stop()
+
+# -------------------------
+# entrypoint
+# -------------------------
+if __name__ == "__main__":
+    asyncio.run(run())

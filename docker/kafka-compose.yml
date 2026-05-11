@@ -29,6 +29,26 @@ services:
       interval: 5s
       retries: 10
 
+  akhq:
+    image: tchiotludo/akhq:latest
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      AKHQ_CONFIGURATION: |
+        akhq:
+          connections:
+            local:
+              properties:
+                bootstrap.servers: "kafka:9092"
+
+    depends_on:
+      - kafka
+    
+    networks:
+      - event-net
+
 networks:
   event-net:
     external: true

@@ -4,5 +4,10 @@ WORKFLOWS = {
         "ai",
         "serialize",
         "final"
+    ],
+    "telegram_pipeline": [
+        "serialize",
+        "ai",
+        "final"
     ]
 }

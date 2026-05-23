@@ -1,108 +1,40 @@
 import asyncio
 import json
+from typing import Dict, Any, Optional
+from services.workers.serializer.helper import clean_text
+from core.worker import BaseWorker
 
-from core.kafka_client import (
-    get_consumer,
-    get_producer,
-    safe_commit
-)
+class SerializerWorker(BaseWorker):
+    def __init__(self):
+        super().__init__(
+            service_name="serializer",
+            topic="serialize-events",
+            group_id="serialize-group"
+        )
 
-from core.logger import log
-from core.kafka_client import start_consumer_with_stability
-
-
-# -------------------------
-# process message
-# -------------------------
-async def handle_message(
-    msg,
-    consumer,
-    producer
-):
-
-    event = msg.value
-
-    try:
-
-        if not isinstance(event, dict):
-            return
-
-        # ensure trace exists
+    async def process_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         event.setdefault("trace", [])
-
         if "serialize" not in event["trace"]:
             event["trace"].append("serialize")
+        
+        payload = event.get("payload", {})
+        text = payload.get("text")
 
-        # serialize full event
-        event["json"] = json.dumps(
-            event,
-            default=str
-        )
+        if not payload or not text:
+            return None
 
-        log(
-            service="serialize",
-            level="info",
-            trace_id=event.get("trace_id"),
-            step="serialize",
-            event=event
-        )
+        event["json"] = json.dumps(event["payload"], default=str)
 
-        # return to engine
-        await producer.send_and_wait(
-            "engine-events",
-            event
-        )
+        event["payload"]["real_text"] = text
+        text = clean_text(text)
+        event["payload"]["text"] = text
 
-        # commit ONLY after success
-        await safe_commit(consumer)
+        print(f"[SERIALIZER] serialized: {text}")
+        return event
 
-    except Exception as e:
-
-        log(
-            service="serialize",
-            level="error",
-            trace_id=event.get("trace_id"),
-            step="serialize",
-            event=event,
-            error=str(e)
-        )
-
-
-# -------------------------
-# main loop
-# -------------------------
 async def run():
-    print("[serialize-worker] started")
+    worker = SerializerWorker()
+    await worker.run()
 
-
-    consumer = get_consumer(
-        "serialize-events",
-        "serialize-group"
-    )
-
-    producer = await get_producer()
-
-    await start_consumer_with_stability(consumer)
-
-    try:
-
-        async for msg in consumer:
-
-            await handle_message(
-                msg,
-                consumer,
-                producer
-            )
-    except asyncio.CancelledError:
-        print("[SHUTDOWN] cancelled")
-    finally:
-
-        await consumer.stop()
-        await producer.stop()
-
-
-# -------------------------
-# entrypoint
-# -------------------------
 if __name__ == "__main__":
     asyncio.run(run())

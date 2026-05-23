@@ -1,116 +1,37 @@
 import asyncio
+from typing import Dict, Any, Optional
 from bs4 import BeautifulSoup
-from core.config import settings
-from core.kafka_client import (
-    get_consumer,
-    get_producer,
-    safe_commit
-)
 
-from core.logger import log
-from core.kafka_client import start_consumer_with_stability
+from core.worker import BaseWorker
 
+def clean_html(html: str) -> str:
+    if not html:
+        return ""
+    return BeautifulSoup(html, "html.parser").get_text()
 
-# -------------------------
-# html cleaner
-# -------------------------
-def clean(html: str) -> str:
+class HTMLCleanerWorker(BaseWorker):
+    def __init__(self):
+        super().__init__(
+            service_name="html_cleaner",
+            topic="html-events",
+            group_id="html-group"
+        )
 
-    return BeautifulSoup(
-        html,
-        "html.parser"
-    ).get_text()
-
-
-# -------------------------
-# process message
-# -------------------------
-async def handle_message(
-    msg,
-    consumer,
-    producer
-):
-
-    event = msg.value
-
-    try:
-
-        raw_html = event["payload"]["payload"]
-
-        # extract text
-        text = clean(raw_html)
-
-        event["text"] = text
-
-        # ensure trace exists
+    async def process_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        raw_html = event.get("payload", {}).get("payload", "")
+        
+        # Extract text from HTML
+        event["payload"]["text"] = clean_html(raw_html)
+        
         event.setdefault("trace", [])
-
         if "html" not in event["trace"]:
             event["trace"].append("html")
+            
+        return event
 
-        log(
-            "html",
-            "info",
-            event.get("trace_id"),
-            "html",
-            event
-        )
-
-        # return to engine
-        await producer.send_and_wait(
-            "engine-events",
-            event
-        )
-
-        # commit ONLY after successful send
-        await safe_commit(consumer)
-
-    except Exception as e:
-
-        log(
-            "html",
-            "error",
-            event.get("trace_id"),
-            "html",
-            event,
-            error=str(e)
-        )
-
-
-# -------------------------
-# main loop
-# -------------------------
 async def run():
-    print("[html-worker] started")
+    worker = HTMLCleanerWorker()
+    await worker.run()
 
-    consumer = get_consumer(
-        "html-events",
-        "html-group"
-    )
-
-    producer = await get_producer()
-
-    await start_consumer_with_stability(consumer)
-
-    try:
-
-        async for msg in consumer:
-
-            await handle_message(
-                msg,
-                consumer,
-                producer
-            )
-    except asyncio.CancelledError:
-        print("[SHUTDOWN] cancelled")
-    finally:
-
-        await consumer.stop()
-        await producer.stop()
-
-
-# -------------------------
-# entrypoint
-# -------------------------
 if __name__ == "__main__":
     asyncio.run(run())

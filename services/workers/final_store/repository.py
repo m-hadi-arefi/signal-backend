@@ -1,22 +1,20 @@
-from shared.database.session import SessionLocal
+from sqlalchemy.ext.asyncio import AsyncSession
 from shared.models.events import Event
 
 
 class EventRepository:
 
-    def __init__(self):
-        self.db = SessionLocal()
+    def __init__(self, session: AsyncSession):
+        self.session = session
 
-    def upsert_event(self, event: dict):
+    async def upsert_event(self, event: dict):
         obj = Event(
             trace_id=event["trace_id"],
             data=event
         )
 
-        self.db.merge(obj)
+        await self.session.merge(obj)
+        await self.session.commit()
 
-    def rollback(self):
-        self.db.rollback()
-
-    def close(self):
-        self.db.close()
+    async def rollback(self):
+        await self.session.rollback()

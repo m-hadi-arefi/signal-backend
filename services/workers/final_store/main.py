@@ -1,81 +1,37 @@
 import asyncio
+from typing import Dict, Any, Optional
 
-from services.workers.final_store.consumer import create_consumer
+from core.worker import BaseWorker
 from services.workers.final_store.repository import EventRepository
 from services.workers.final_store.processor import EventProcessor
-from core.config import settings
-from core.logger import log
-from core.kafka_client import safe_commit
-from core.kafka_client import start_consumer_with_stability
+from shared.database.session import SessionLocal
 
-
-processor = EventProcessor()
-repo = EventRepository()
-
-
-# -------------------------
-# handle event
-# -------------------------
-async def handle_event(msg, consumer):
-
-    event = msg.value
-
-    try:
-        clean_event = processor.process(event)
-        repo.upsert_event(clean_event)
-        repo.db.commit()
-        log(
-            "final_store",
-            "info",
-            clean_event.get("trace_id"),
-            "saved successfully",
-            clean_event
+class FinalStoreWorker(BaseWorker):
+    def __init__(self):
+        super().__init__(
+            service_name="final_store",
+            topic="final-events",
+            group_id="final-group"
         )
-        await safe_commit(consumer)
+        self.processor = EventProcessor()
 
-    except Exception as e:
+    async def process_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        clean_event = self.processor.process(event)
+        
+        async with SessionLocal() as session:
+            repo = EventRepository(session)
+            try:
+                await repo.upsert_event(clean_event)
+            except Exception:
+                await repo.rollback()
+                raise
+                
+        # Return None as this is the final step
+        return None
 
-        try:
-            repo.db.rollback()
-        except:
-            pass
-
-        log(
-            "final_store",
-            "error",
-            event.get("trace_id"),
-            "failed to store event",
-            event,
-            error=str(e)
-        )
-
-
-# -------------------------
-# main loop
-# -------------------------
 async def run():
-    print("[final-store] started")
+    worker = FinalStoreWorker()
+    await worker.run()
 
-    consumer = create_consumer()
-
-    await start_consumer_with_stability(consumer)
-
-    try:
-
-        async for msg in consumer:
-            await handle_event(msg, consumer)
-            
-    except asyncio.CancelledError:
-        print("[SHUTDOWN] cancelled")
-
-    finally:
-
-        await consumer.stop()
-        repo.close()
-
-
-# -------------------------
-# entrypoint
-# -------------------------
 if __name__ == "__main__":
     asyncio.run(run())

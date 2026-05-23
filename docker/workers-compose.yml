@@ -3,7 +3,12 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    command:  sh -c "sleep 10 && watchfiles 'python services/engine/main.py'"
+    command:  watchfiles 'python services/engine/main.py'
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/worker_ready"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
     depends_on:
       kafka:
         condition: service_healthy
@@ -20,7 +25,12 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    command:  sh -c "sleep 10 && watchfiles 'python services/workers/html_cleaner/main.py'"
+    command:  watchfiles 'python services/workers/html_cleaner/main.py'
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/worker_ready"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
     depends_on:
       kafka:
         condition: service_healthy
@@ -37,7 +47,12 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    command:  sh -c "sleep 10 && watchfiles 'python services/workers/ai_worker/main.py'"
+    command:  watchfiles 'python services/workers/ai_worker/main.py'
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/worker_ready"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
     depends_on:
       kafka:
         condition: service_healthy
@@ -54,7 +69,12 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    command:  sh -c "sleep 10 && watchfiles 'python services/workers/serializer/main.py'"
+    command:  watchfiles 'python services/workers/serializer/main.py'
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/worker_ready"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
     depends_on:
       kafka:
         condition: service_healthy
@@ -71,7 +91,12 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    command:  sh -c "sleep 10 && watchfiles 'python services/workers/final_store/main.py'"
+    command:  watchfiles 'python services/workers/final_store/main.py'
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/worker_ready"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
     depends_on:
       kafka:
         condition: service_healthy

@@ -1,0 +1,1562 @@
+[
+    {
+        "name": "Bitcoin",
+        "symbol": "btc",
+        "faName": "بیت‌کوین"
+    },
+    {
+        "name": "Ethereum",
+        "symbol": "eth",
+        "faName": "اتریوم"
+    },
+    {
+        "name": "Tether",
+        "symbol": "usdt",
+        "faName": "تتر"
+    },
+    {
+        "name": "Shiba Inu",
+        "symbol": "shib",
+        "faName": "شیبا"
+    },
+    {
+        "name": "Bitcoin Cash",
+        "symbol": "bch",
+        "faName": "بیت‌کوین‌کش"
+    },
+    {
+        "name": "Litecoin",
+        "symbol": "ltc",
+        "faName": "لایت‌کوین"
+    },
+    {
+        "name": "Ethereum Classic",
+        "symbol": "etc",
+        "faName": "اتریوم کلاسیک"
+    },
+    {
+        "name": "Dogecoin",
+        "symbol": "doge",
+        "faName": "دوج‌کوین"
+    },
+    {
+        "name": "Cardano",
+        "symbol": "ada",
+        "faName": "کاردانو"
+    },
+    {
+        "name": "BNB",
+        "symbol": "bnb",
+        "faName": "بایننس‌کوین"
+    },
+    {
+        "name": "XRP",
+        "symbol": "xrp",
+        "faName": "ریپل"
+    },
+    {
+        "name": "TRON",
+        "symbol": "trx",
+        "faName": "ترون"
+    },
+    {
+        "name": "Uniswap",
+        "symbol": "uni",
+        "faName": "یونی‌سواپ"
+    },
+    {
+        "name": "Chainlink",
+        "symbol": "link",
+        "faName": "چین‌لینک"
+    },
+    {
+        "name": "Dai",
+        "symbol": "dai",
+        "faName": "دای"
+    },
+    {
+        "name": "Polkadot",
+        "symbol": "dot",
+        "faName": "پولکادات"
+    },
+    {
+        "name": "Aave",
+        "symbol": "aave",
+        "faName": "آوه"
+    },
+    {
+        "name": "peyman",
+        "symbol": "pmn",
+        "faName": "پیمان"
+    },
+    {
+        "name": "Polygon",
+        "symbol": "pol",
+        "faName": "پالیگان"
+    },
+    {
+        "name": "Axie Infinity",
+        "symbol": "axs",
+        "faName": "اکسی‌اینفینیتی"
+    },
+    {
+        "name": "Decentraland",
+        "symbol": "mana",
+        "faName": "دیسنترالند"
+    },
+    {
+        "name": "The Sandbox",
+        "symbol": "sand",
+        "faName": "سندباکس"
+    },
+    {
+        "name": "Avalanche",
+        "symbol": "avax",
+        "faName": "آوالانچ"
+    },
+    {
+        "name": "USDC",
+        "symbol": "usdc",
+        "faName": "یو‌اس‌‌دی‌کوین"
+    },
+    {
+        "name": "GMT",
+        "symbol": "gmt",
+        "faName": "استپن"
+    },
+    {
+        "name": "Maker",
+        "symbol": "mkr",
+        "faName": "میکر"
+    },
+    {
+        "name": "Solana",
+        "symbol": "sol",
+        "faName": "سولانا"
+    },
+    {
+        "name": "Cosmos",
+        "symbol": "atom",
+        "faName": "اتم"
+    },
+    {
+        "name": "The Graph",
+        "symbol": "grt",
+        "faName": "گراف"
+    },
+    {
+        "name": "Basic Attention Token",
+        "symbol": "bat",
+        "faName": "بیسیک اتنشن توکن"
+    },
+    {
+        "name": "NEAR Protocol ",
+        "symbol": "near",
+        "faName": "نیر پروتکل"
+    },
+    {
+        "name": "ApeCoin",
+        "symbol": "ape",
+        "faName": "ایپ‌کوین"
+    },
+    {
+        "name": "Quant",
+        "symbol": "qnt",
+        "faName": "کوانت"
+    },
+    {
+        "name": "Chiliz",
+        "symbol": "chz",
+        "faName": "چیلیز"
+    },
+    {
+        "name": "Monero",
+        "symbol": "xmr",
+        "faName": "مونرو"
+    },
+    {
+        "name": "Gala",
+        "symbol": "egala",
+        "faName": "گالا"
+    },
+    {
+        "name": "BUSD",
+        "symbol": "busd",
+        "faName": "بایننس یواس‌دی"
+    },
+    {
+        "name": "Algorand",
+        "symbol": "algo",
+        "faName": "الگورند"
+    },
+    {
+        "name": "Hedera",
+        "symbol": "hbar",
+        "faName": "هدرا"
+    },
+    {
+        "name": "1inch Network",
+        "symbol": "1inch",
+        "faName": "وان اینچ نتورک"
+    },
+    {
+        "name": "yearn finance",
+        "symbol": "yfi",
+        "faName": "یرن فایننس"
+    },
+    {
+        "name": "Flow",
+        "symbol": "flow",
+        "faName": "فلو"
+    },
+    {
+        "name": "Synthetix",
+        "symbol": "snx",
+        "faName": "سینتتیکس"
+    },
+    {
+        "name": "Enjin Coin",
+        "symbol": "enj",
+        "faName": "انجین کوین"
+    },
+    {
+        "name": "Curve DAO Token",
+        "symbol": "crv",
+        "faName": "کرو دائو توکن"
+    },
+    {
+        "name": "Filecoin",
+        "symbol": "fil",
+        "faName": "فایل کوین"
+    },
+    {
+        "name": "Wrapped Bitcoin",
+        "symbol": "wbtc",
+        "faName": "رپد بیت‌کوین"
+    },
+    {
+        "name": "Lido DAO",
+        "symbol": "ldo",
+        "faName": "لیدو دائو"
+    },
+    {
+        "name": "dYdX",
+        "symbol": "dydx",
+        "faName": "دی‌وای دی‌ایکس"
+    },
+    {
+        "name": "Flare",
+        "symbol": "flr",
+        "faName": "فلر"
+    },
+    {
+        "name": "Aptos",
+        "symbol": "apt",
+        "faName": "اپتاس"
+    },
+    {
+        "name": "Mask Network",
+        "symbol": "mask",
+        "faName": "مسک نتورک"
+    },
+    {
+        "name": "Compound",
+        "symbol": "comp",
+        "faName": "کامپاند"
+    },
+    {
+        "name": "Balancer",
+        "symbol": "bal",
+        "faName": "بالانسر"
+    },
+    {
+        "name": "Loopring",
+        "symbol": "lrc",
+        "faName": "لوپرینگ"
+    },
+    {
+        "name": "Livepeer",
+        "symbol": "lpt",
+        "faName": "لایوپیر"
+    },
+    {
+        "name": "Ethereum Name Service",
+        "symbol": "ens",
+        "faName": "اتریوم نیم سرویس"
+    },
+    {
+        "name": "SushiSwap",
+        "symbol": "sushi",
+        "faName": "سوشی‌سواپ"
+    },
+    {
+        "name": "API3",
+        "symbol": "api3",
+        "faName": "ای پی آی ۳"
+    },
+    {
+        "name": "Harmony",
+        "symbol": "one",
+        "faName": "هارمونی"
+    },
+    {
+        "name": "Golem",
+        "symbol": "glm",
+        "faName": "گولم"
+    },
+    {
+        "name": "DAO Maker",
+        "symbol": "dao",
+        "faName": "دائو میکر"
+    },
+    {
+        "name": "Civic",
+        "symbol": "cvc",
+        "faName": "سیویک"
+    },
+    {
+        "name": "Numeraire",
+        "symbol": "nmr",
+        "faName": "نومریر"
+    },
+    {
+        "name": "Storj",
+        "symbol": "storj",
+        "faName": "استورج"
+    },
+    {
+        "name": "Status",
+        "symbol": "snt",
+        "faName": "استاتوس"
+    },
+    {
+        "name": "Vaulta",
+        "symbol": "a",
+        "faName": "والتا"
+    },
+    {
+        "name": "0x Protocol",
+        "symbol": "zrx",
+        "faName": "زیرو ایکس"
+    },
+    {
+        "name": "Smooth Love Potion",
+        "symbol": "slp",
+        "faName": "اسموث لاو پوشن"
+    },
+    {
+        "name": "MultiversX",
+        "symbol": "egld",
+        "faName": "مولتی ورس ایکس"
+    },
+    {
+        "name": "Immutable",
+        "symbol": "imx",
+        "faName": "ایموتبل ایکس"
+    },
+    {
+        "name": "Blur",
+        "symbol": "blur",
+        "faName": "بلر"
+    },
+    {
+        "name": "FLOKI",
+        "symbol": "floki",
+        "faName": "فلوکی"
+    },
+    {
+        "name": "Baby Doge Coin",
+        "symbol": "babydoge",
+        "faName": "بیبی دوج"
+    },
+    {
+        "name": "APENFT",
+        "symbol": "nft",
+        "faName": "ایپ ان‌اف‌تی"
+    },
+    {
+        "name": "BitTorrent",
+        "symbol": "btt",
+        "faName": "بی‌تی‌تی"
+    },
+    {
+        "name": "Threshold",
+        "symbol": "t",
+        "faName": "ترشولد"
+    },
+    {
+        "name": "Celer Network",
+        "symbol": "celr",
+        "faName": "سلر نتورک"
+    },
+    {
+        "name": "Arbitrum",
+        "symbol": "arb",
+        "faName": "آربیتروم"
+    },
+    {
+        "name": "Treasure",
+        "symbol": "magic",
+        "faName": "ترژر"
+    },
+    {
+        "name": "GMX",
+        "symbol": "gmx",
+        "faName": "جی‌ام‌اکس"
+    },
+    {
+        "name": "Band Protocol",
+        "symbol": "band",
+        "faName": "بند پروتکل"
+    },
+    {
+        "name": "Convex Finance",
+        "symbol": "cvx",
+        "faName": "کانوکس فایننس"
+    },
+    {
+        "name": "Toncoin",
+        "symbol": "ton",
+        "faName": "تون کوین"
+    },
+    {
+        "name": "Measurable Data Token",
+        "symbol": "mdt",
+        "faName": "مژربل دیتا"
+    },
+    {
+        "name": "ssv network",
+        "symbol": "ssv",
+        "faName": "اس‌اس‌وی نتورک"
+    },
+    {
+        "name": "OMG Network",
+        "symbol": "omg",
+        "faName": "او‌ام‌جی نتورک"
+    },
+    {
+        "name": "Worldcoin",
+        "symbol": "wld",
+        "faName": "ورلد کوین"
+    },
+    {
+        "name": "Radiant Capital",
+        "symbol": "rdnt",
+        "faName": "رادیانت کپیتال"
+    },
+    {
+        "name": "JUST",
+        "symbol": "jst",
+        "faName": "جاست"
+    },
+    {
+        "name": "Render",
+        "symbol": "render",
+        "faName": "رندر"
+    },
+    {
+        "name": "Biconomy",
+        "symbol": "bico",
+        "faName": "بیکونومی"
+    },
+    {
+        "name": "WOO Network",
+        "symbol": "woo",
+        "faName": "وو نتورک"
+    },
+    {
+        "name": "SKALE",
+        "symbol": "skl",
+        "faName": "اسکیل"
+    },
+    {
+        "name": "Fetch.ai",
+        "symbol": "fet",
+        "faName": "فچ ای آی"
+    },
+    {
+        "name": "Notcoin",
+        "symbol": "not",
+        "faName": "نات کوین"
+    },
+    {
+        "name": "Tellor",
+        "symbol": "trb",
+        "faName": "تلور"
+    },
+    {
+        "name": "Pepe",
+        "symbol": "pepe",
+        "faName": "پپه"
+    },
+    {
+        "name": "Reserve Rights",
+        "symbol": "rsr",
+        "faName": "رزرو رایتس"
+    },
+    {
+        "name": "ether.fi",
+        "symbol": "ethfi",
+        "faName": "اترفای"
+    },
+    {
+        "name": "Adventure Gold",
+        "symbol": "agld",
+        "faName": "ادونچر گلد"
+    },
+    {
+        "name": "Aevo",
+        "symbol": "aevo",
+        "faName": "آئوو"
+    },
+    {
+        "name": "Mantra",
+        "symbol": "om",
+        "faName": "مانترا"
+    },
+    {
+        "name": "Memecoin",
+        "symbol": "meme",
+        "faName": "میم کوین"
+    },
+    {
+        "name": "UMA",
+        "symbol": "uma",
+        "faName": "اوما"
+    },
+    {
+        "name": "LayerZero",
+        "symbol": "zro",
+        "faName": "لیر زیرو"
+    },
+    {
+        "name": "Dogs",
+        "symbol": "dogs",
+        "faName": "داگز"
+    },
+    {
+        "name": "Gravity",
+        "symbol": "g",
+        "faName": "گرویتی"
+    },
+    {
+        "name": "Ondo",
+        "symbol": "ondo",
+        "faName": "اوندو"
+    },
+    {
+        "name": "Bounce Token",
+        "symbol": "auction",
+        "faName": "بانس توکن"
+    },
+    {
+        "name": "Yield Guild Games",
+        "symbol": "ygg",
+        "faName": "ییلد گیلد گیمز"
+    },
+    {
+        "name": "Perpetual Protocol",
+        "symbol": "perp",
+        "faName": "پریپچوال پروتکل"
+    },
+    {
+        "name": "Kyber Network Crystal",
+        "symbol": "knc",
+        "faName": "کایبر نتورک کریستال"
+    },
+    {
+        "name": "Stella",
+        "symbol": "alpha",
+        "faName": "استلا"
+    },
+    {
+        "name": "Bancor",
+        "symbol": "bnt",
+        "faName": "بنکور"
+    },
+    {
+        "name": "Ren",
+        "symbol": "ren",
+        "faName": "رن"
+    },
+    {
+        "name": "Badger DAO",
+        "symbol": "badger",
+        "faName": "بجر دائو"
+    },
+    {
+        "name": "SPACE ID",
+        "symbol": "id",
+        "faName": "اسپیس آی‌دی"
+    },
+    {
+        "name": "Catizen",
+        "symbol": "cati",
+        "faName": "کتیزن"
+    },
+    {
+        "name": "Hamster Kombat",
+        "symbol": "hmstr",
+        "faName": "همستر کامبت"
+    },
+    {
+        "name": "EigenCloud",
+        "symbol": "eigen",
+        "faName": "آیگن‌کلاود"
+    },
+    {
+        "name": "Pax Gold",
+        "symbol": "paxg",
+        "faName": "پکس گلد"
+    },
+    {
+        "name": "Tether Gold",
+        "symbol": "xaut",
+        "faName": "تتر گلد"
+    },
+    {
+        "name": "Tezos",
+        "symbol": "xtz",
+        "faName": "تزوس"
+    },
+    {
+        "name": "Ethena",
+        "symbol": "ena",
+        "faName": "اتنا"
+    },
+    {
+        "name": "Pendle",
+        "symbol": "pendle",
+        "faName": "پندل"
+    },
+    {
+        "name": "X Empire",
+        "symbol": "x",
+        "faName": "ایکس امپایر"
+    },
+    {
+        "name": "JasmyCoin",
+        "symbol": "jasmy",
+        "faName": "جسمی کوین"
+    },
+    {
+        "name": "SuperVerse",
+        "symbol": "super",
+        "faName": "سوپر ورس"
+    },
+    {
+        "name": "Ankr",
+        "symbol": "ankr",
+        "faName": "انکر"
+    },
+    {
+        "name": "PancakeSwap",
+        "symbol": "cake",
+        "faName": "پنکیک سواپ"
+    },
+    {
+        "name": "Holo",
+        "symbol": "hot",
+        "faName": "هولو"
+    },
+    {
+        "name": "Open Campus",
+        "symbol": "edu",
+        "faName": "اپن کمپس"
+    },
+    {
+        "name": "Major",
+        "symbol": "major",
+        "faName": "میجر"
+    },
+    {
+        "name": "Safe",
+        "symbol": "safe",
+        "faName": "سیف"
+    },
+    {
+        "name": "Banana Gun",
+        "symbol": "banana",
+        "faName": "بنانا گان"
+    },
+    {
+        "name": "Movement",
+        "symbol": "move",
+        "faName": "موومنت"
+    },
+    {
+        "name": "Wormhole",
+        "symbol": "w",
+        "faName": "ورم هول"
+    },
+    {
+        "name": "Starknet",
+        "symbol": "strk",
+        "faName": "استارک نت"
+    },
+    {
+        "name": "MetisDAO",
+        "symbol": "metis",
+        "faName": "متیس دائو"
+    },
+    {
+        "name": "Zilliqa",
+        "symbol": "zil",
+        "faName": "زیلیکا"
+    },
+    {
+        "name": "Turbo",
+        "symbol": "turbo",
+        "faName": "توربو"
+    },
+    {
+        "name": "Cookie DAO",
+        "symbol": "cookie",
+        "faName": "کوکی دائو"
+    },
+    {
+        "name": "ChainGPT",
+        "symbol": "cgpt",
+        "faName": "چین جی پی تی"
+    },
+    {
+        "name": "Sonic",
+        "symbol": "s",
+        "faName": "سونیک"
+    },
+    {
+        "name": "Injective",
+        "symbol": "inj",
+        "faName": "اینجکتیو"
+    },
+    {
+        "name": "Zcash",
+        "symbol": "zec",
+        "faName": "زی‌کش"
+    },
+    {
+        "name": "Dexe",
+        "symbol": "dexe",
+        "faName": "دکسی"
+    },
+    {
+        "name": "Aethir",
+        "symbol": "ath",
+        "faName": "ایثیر"
+    },
+    {
+        "name": "Neiro",
+        "symbol": "neiro",
+        "faName": "نیرو"
+    },
+    {
+        "name": "Bonk",
+        "symbol": "bonk",
+        "faName": "بونک"
+    },
+    {
+        "name": "Morpho",
+        "symbol": "morpho",
+        "faName": "مورفو"
+    },
+    {
+        "name": "Simon's Cat",
+        "symbol": "cat",
+        "faName": "کت"
+    },
+    {
+        "name": "Four",
+        "symbol": "form",
+        "faName": "فور"
+    },
+    {
+        "name": "dogwifhat",
+        "symbol": "wif",
+        "faName": "داگ ویف هت"
+    },
+    {
+        "name": "Raydium",
+        "symbol": "ray",
+        "faName": "ریدیوم"
+    },
+    {
+        "name": "Tensor",
+        "symbol": "tnsr",
+        "faName": "تنسور"
+    },
+    {
+        "name": "Phala Network",
+        "symbol": "pha",
+        "faName": "فالا نتورک"
+    },
+    {
+        "name": "WAX",
+        "symbol": "waxp",
+        "faName": "وکس"
+    },
+    {
+        "name": "Frax",
+        "symbol": "fxs",
+        "faName": "فرکس"
+    },
+    {
+        "name": "Trust Wallet Token",
+        "symbol": "twt",
+        "faName": "تراست ولت توکن"
+    },
+    {
+        "name": "Orbs",
+        "symbol": "orbs",
+        "faName": "اربز"
+    },
+    {
+        "name": "SafePal",
+        "symbol": "sfp",
+        "faName": "سیف پل"
+    },
+    {
+        "name": "Zentry",
+        "symbol": "zent",
+        "faName": "زنتری"
+    },
+    {
+        "name": "Illuvium",
+        "symbol": "ilv",
+        "faName": "ایلوویم"
+    },
+    {
+        "name": "Rocket Pool",
+        "symbol": "rpl",
+        "faName": "راکت پول"
+    },
+    {
+        "name": "IQ",
+        "symbol": "iq",
+        "faName": "آی کیو"
+    },
+    {
+        "name": "Usual",
+        "symbol": "usual",
+        "faName": "یوژوال"
+    },
+    {
+        "name": "Big Time",
+        "symbol": "bigtime",
+        "faName": "بیگ تایم"
+    },
+    {
+        "name": "Vine Coin",
+        "symbol": "vine",
+        "faName": "واین کوین"
+    },
+    {
+        "name": "Act I : The AI Prophecy",
+        "symbol": "act",
+        "faName": "اکت آی"
+    },
+    {
+        "name": "Goatseus Maximus",
+        "symbol": "goat",
+        "faName": "گوتسئوس ماکسیموس "
+    },
+    {
+        "name": "Animecoin",
+        "symbol": "anime",
+        "faName": "انیمه کوین"
+    },
+    {
+        "name": "Stargate Finance",
+        "symbol": "stg",
+        "faName": "استارگیت فایننس"
+    },
+    {
+        "name": "CoW Protocol",
+        "symbol": "cow",
+        "faName": "کاو پروتکل"
+    },
+    {
+        "name": "ConstitutionDAO",
+        "symbol": "people",
+        "faName": "کانستیتوشن دائو "
+    },
+    {
+        "name": "Powerledger",
+        "symbol": "powr",
+        "faName": "پاورلجر"
+    },
+    {
+        "name": "Alchemy Pay",
+        "symbol": "ach",
+        "faName": "الکمی پی"
+    },
+    {
+        "name": "Xai",
+        "symbol": "xai",
+        "faName": "ایکس ای آی"
+    },
+    {
+        "name": "aixbt by Virtuals",
+        "symbol": "aixbt",
+        "faName": "ای آی ایکس بی تی"
+    },
+    {
+        "name": "Virtuals Protocol",
+        "symbol": "virtual",
+        "faName": "ویرچوالز پروتکل"
+    },
+    {
+        "name": "KAITO",
+        "symbol": "kaito",
+        "faName": "کایتو"
+    },
+    {
+        "name": "Stellar",
+        "symbol": "xlm",
+        "faName": "استلار"
+    },
+    {
+        "name": "Pudgy Penguins",
+        "symbol": "pengu",
+        "faName": "پاجی پنگوئن"
+    },
+    {
+        "name": "Jupiter",
+        "symbol": "jup",
+        "faName": "ژوپیتر"
+    },
+    {
+        "name": "io.net",
+        "symbol": "io",
+        "faName": "آیو"
+    },
+    {
+        "name": "Pump.fun",
+        "symbol": "pump",
+        "faName": "پامپ فان"
+    },
+    {
+        "name": "Solayer",
+        "symbol": "layer",
+        "faName": "سولیر"
+    },
+    {
+        "name": "Peanut the Squirrel",
+        "symbol": "pnut",
+        "faName": "پینات"
+    },
+    {
+        "name": "BOOK OF MEME",
+        "symbol": "bome",
+        "faName": "بوک آف میم"
+    },
+    {
+        "name": "Maple Finance",
+        "symbol": "syrup",
+        "faName": "میپل فایننس"
+    },
+    {
+        "name": "Altlayer",
+        "symbol": "alt",
+        "faName": "آلت‌لیر"
+    },
+    {
+        "name": "Orca",
+        "symbol": "orca",
+        "faName": "اورکا"
+    },
+    {
+        "name": "Polyhedra Network",
+        "symbol": "zkj",
+        "faName": "پلی‌هدرا نتورک"
+    },
+    {
+        "name": "Jito",
+        "symbol": "jto",
+        "faName": "جیتو"
+    },
+    {
+        "name": "IoTeX",
+        "symbol": "iotx",
+        "faName": "آیوتکس"
+    },
+    {
+        "name": "Amp",
+        "symbol": "amp",
+        "faName": "امپ"
+    },
+    {
+        "name": "Conflux",
+        "symbol": "cfx",
+        "faName": "کانفلاکس"
+    },
+    {
+        "name": "Nexo",
+        "symbol": "nexo",
+        "faName": "نکسو"
+    },
+    {
+        "name": "Sky",
+        "symbol": "sky",
+        "faName": "اسکای"
+    },
+    {
+        "name": "Sahara AI",
+        "symbol": "sahara",
+        "faName": "ساهارا ای آی"
+    },
+    {
+        "name": "Pyth Network",
+        "symbol": "pyth",
+        "faName": "پایث نتورک"
+    },
+    {
+        "name": "Axelar",
+        "symbol": "axl",
+        "faName": "اکسلار"
+    },
+    {
+        "name": "Sui",
+        "symbol": "sui",
+        "faName": "سویی"
+    },
+    {
+        "name": "Bio Protocol",
+        "symbol": "bio",
+        "faName": "بیو پروتکل"
+    },
+    {
+        "name": "Magic Eden",
+        "symbol": "me",
+        "faName": "مجیک ایدن"
+    },
+    {
+        "name": "Sun",
+        "symbol": "sun",
+        "faName": "سان"
+    },
+    {
+        "name": "cat in a dogs world",
+        "symbol": "mew",
+        "faName": "میو"
+    },
+    {
+        "name": "Kamino Finance",
+        "symbol": "kmno",
+        "faName": "کامینو فایننس"
+    },
+    {
+        "name": "Linea",
+        "symbol": "linea",
+        "faName": "لینیا"
+    },
+    {
+        "name": "Aster",
+        "symbol": "aster",
+        "faName": "استر"
+    },
+    {
+        "name": "Avantis",
+        "symbol": "avnt",
+        "faName": "آوانتیس"
+    },
+    {
+        "name": "Lombard",
+        "symbol": "bard",
+        "faName": "لومبارد"
+    },
+    {
+        "name": "Boundless",
+        "symbol": "zkc",
+        "faName": "باوندلس"
+    },
+    {
+        "name": "Cheems",
+        "symbol": "cheems",
+        "faName": "چیمز"
+    },
+    {
+        "name": "Optimism",
+        "symbol": "op",
+        "faName": "آپتیمیزم"
+    },
+    {
+        "name": "Sei",
+        "symbol": "sei",
+        "faName": "سی"
+    },
+    {
+        "name": "USDe",
+        "symbol": "usde",
+        "faName": "یو‌اس‌‌دی‌ای"
+    },
+    {
+        "name": "DoubleZero",
+        "symbol": "2z",
+        "faName": "دابل‌زیرو"
+    },
+    {
+        "name": "Aerodrome Finance",
+        "symbol": "aero",
+        "faName": "ایرودروم فایننس"
+    },
+    {
+        "name": "Beam",
+        "symbol": "beamx",
+        "faName": "بیم"
+    },
+    {
+        "name": "Toshi",
+        "symbol": "toshi",
+        "faName": "توشی"
+    },
+    {
+        "name": "Moo Deng",
+        "symbol": "moodeng",
+        "faName": "مودنگ"
+    },
+    {
+        "name": "Venus",
+        "symbol": "xvs",
+        "faName": "ونوس"
+    },
+    {
+        "name": "Huma Finance",
+        "symbol": "huma",
+        "faName": "هوما فایننس"
+    },
+    {
+        "name": "Spark",
+        "symbol": "spk",
+        "faName": "اسپارک"
+    },
+    {
+        "name": "Sign",
+        "symbol": "sign",
+        "faName": "ساین"
+    },
+    {
+        "name": "Pixels",
+        "symbol": "pixel",
+        "faName": "پیکسلز"
+    },
+    {
+        "name": "Liquity",
+        "symbol": "lqty",
+        "faName": "لیکوییتی"
+    },
+    {
+        "name": "KernelDAO",
+        "symbol": "kernel",
+        "faName": "کرنل‌دائو"
+    },
+    {
+        "name": "iExec RLC",
+        "symbol": "rlc",
+        "faName": "آی اگزک آر‌ال‌سی"
+    },
+    {
+        "name": "Degen",
+        "symbol": "degen",
+        "faName": "دیجن"
+    },
+    {
+        "name": "Across Protocol",
+        "symbol": "acx",
+        "faName": "اکراس پروتکل"
+    },
+    {
+        "name": "Creditcoin",
+        "symbol": "ctc",
+        "faName": "کردیت‌کوین"
+    },
+    {
+        "name": "Giggle Fund",
+        "symbol": "giggle",
+        "faName": "گیگل فاند"
+    },
+    {
+        "name": "Succinct",
+        "symbol": "prove",
+        "faName": "ساکسینکت"
+    },
+    {
+        "name": "Meteora",
+        "symbol": "met",
+        "faName": "متئورا"
+    },
+    {
+        "name": "Zora",
+        "symbol": "zora",
+        "faName": "زورا"
+    },
+    {
+        "name": "Walrus",
+        "symbol": "wal",
+        "faName": "والروس"
+    },
+    {
+        "name": "Prom",
+        "symbol": "prom",
+        "faName": "پرام"
+    },
+    {
+        "name": "Horizen",
+        "symbol": "zen",
+        "faName": "هورایزن"
+    },
+    {
+        "name": "Euler",
+        "symbol": "eul",
+        "faName": "اولر"
+    },
+    {
+        "name": "Momentum",
+        "symbol": "mmt",
+        "faName": "مومنتوم"
+    },
+    {
+        "name": "Kite",
+        "symbol": "kite",
+        "faName": "کایت"
+    },
+    {
+        "name": "Humidifi",
+        "symbol": "wet",
+        "faName": "هیومیدیفای"
+    },
+    {
+        "name": "Doodles",
+        "symbol": "dood",
+        "faName": "دودلز"
+    },
+    {
+        "name": "Apro",
+        "symbol": "at",
+        "faName": "اپرو"
+    },
+    {
+        "name": "Fluid",
+        "symbol": "fluid",
+        "faName": "فلوئید"
+    },
+    {
+        "name": "RedStone",
+        "symbol": "red",
+        "faName": "رد استون"
+    },
+    {
+        "name": "Lagrange",
+        "symbol": "la",
+        "faName": "لاگرانژ"
+    },
+    {
+        "name": "COTI",
+        "symbol": "coti",
+        "faName": "کوتی"
+    },
+    {
+        "name": "Hyperliquid",
+        "symbol": "hype",
+        "faName": "هایپرلیکویید"
+    },
+    {
+        "name": "Lighter",
+        "symbol": "lit",
+        "faName": "لایتر"
+    },
+    {
+        "name": "ZkSync",
+        "symbol": "zk",
+        "faName": "زی‌کی سینک"
+    },
+    {
+        "name": "Dash",
+        "symbol": "dash",
+        "faName": "دش"
+    },
+    {
+        "name": "Bittensor",
+        "symbol": "tao",
+        "faName": "بیت‌تنسور"
+    },
+    {
+        "name": "Celestia",
+        "symbol": "tia",
+        "faName": "سلستیا"
+    },
+    {
+        "name": "Brevis",
+        "symbol": "brev",
+        "faName": "برویس"
+    },
+    {
+        "name": "Zama",
+        "symbol": "zama",
+        "faName": "زاما"
+    },
+    {
+        "name": "Sentient",
+        "symbol": "sent",
+        "faName": "سنشنت"
+    },
+    {
+        "name": "iShares Silver Trust Tokenized ETF",
+        "symbol": "slvon",
+        "faName": "نقره دیجیتال"
+    },
+    {
+        "name": "SPX6900",
+        "symbol": "spx",
+        "faName": "اس پی ایکس"
+    },
+    {
+        "name": "USD AI",
+        "symbol": "chip",
+        "faName": "یو‌اس‌دی ای آی"
+    },
+    {
+        "name": "AWE",
+        "symbol": "awe",
+        "faName": "ای‌دبلیو‌ای"
+    },
+    {
+        "name": "Based",
+        "symbol": "based",
+        "faName": "بیسد"
+    },
+    {
+        "name": "Centrifuge",
+        "symbol": "cfg",
+        "faName": "سنتریفیوژ"
+    },
+    {
+        "name": "Fabric Protocol",
+        "symbol": "robo",
+        "faName": "فبریک پروتکل"
+    },
+    {
+        "name": "Defi App",
+        "symbol": "home",
+        "faName": "دیفای اپ"
+    },
+    {
+        "name": "MYX Finance",
+        "symbol": "myx",
+        "faName": "میکس فایننس"
+    },
+    {
+        "name": "Telcoin",
+        "symbol": "tel",
+        "faName": "تل‌کوین"
+    },
+    {
+        "name": "Fartcoin",
+        "symbol": "fartcoin",
+        "faName": "فارت‌کوین"
+    },
+    {
+        "name": "Brett",
+        "symbol": "brett",
+        "faName": "برت"
+    },
+    {
+        "name": "Vision",
+        "symbol": "vsn",
+        "faName": "ویژن"
+    },
+    {
+        "name": "Zebec Network",
+        "symbol": "zbcn",
+        "faName": "زبک نتورک"
+    },
+    {
+        "name": "Gnosis",
+        "symbol": "gno",
+        "faName": "نوسیس"
+    },
+    {
+        "name": "Helium",
+        "symbol": "hnt",
+        "faName": "هلیوم"
+    },
+    {
+        "name": "OriginTrail",
+        "symbol": "trac",
+        "faName": "اوریجین‌تریل"
+    },
+    {
+        "name": "Humanity Protocol",
+        "symbol": "h",
+        "faName": "هیومنیتی پروتکل"
+    },
+    {
+        "name": "Mog Coin",
+        "symbol": "mog",
+        "faName": "ماگ‌کوین"
+    },
+    {
+        "name": "SOON",
+        "symbol": "soon",
+        "faName": "سون"
+    },
+    {
+        "name": "Audiera",
+        "symbol": "beat",
+        "faName": "آودیرا"
+    },
+    {
+        "name": "Ribbita by Virtuals",
+        "symbol": "tibbir",
+        "faName": " ربیتا بای ویرچوالز"
+    },
+    {
+        "name": "AB",
+        "symbol": "ab",
+        "faName": "ای بی"
+    },
+    {
+        "name": "pippin",
+        "symbol": "pippin",
+        "faName": "پیپین"
+    },
+    {
+        "name": "BUILDon",
+        "symbol": "b",
+        "faName": "بیلدآن"
+    },
+    {
+        "name": "Drift",
+        "symbol": "drift",
+        "faName": "دریفت"
+    },
+    {
+        "name": "Popcat",
+        "symbol": "popcat",
+        "faName": "پاپ‌کت"
+    },
+    {
+        "name": "Alchemist AI",
+        "symbol": "alch",
+        "faName": "الکمیست ای‌آی"
+    },
+    {
+        "name": "Power Protocol",
+        "symbol": "power",
+        "faName": "پاور پروتکل"
+    },
+    {
+        "name": "Venice Token",
+        "symbol": "vvv",
+        "faName": "ونیس توکن"
+    },
+    {
+        "name": "Audius",
+        "symbol": "audio",
+        "faName": "آدیوس"
+    },
+    {
+        "name": "River",
+        "symbol": "river",
+        "faName": "ریور"
+    },
+    {
+        "name": "Spell Token",
+        "symbol": "spell",
+        "faName": "اسپل توکن"
+    },
+    {
+        "name": "Unibase",
+        "symbol": "ub",
+        "faName": "یونیبیس"
+    },
+    {
+        "name": "ZIGChain",
+        "symbol": "zig",
+        "faName": "زیگ چین"
+    },
+    {
+        "name": "SoSoValue",
+        "symbol": "soso",
+        "faName": "سوسو ولیو"
+    },
+    {
+        "name": "CARV",
+        "symbol": "carv",
+        "faName": "کارو"
+    },
+    {
+        "name": "XYO",
+        "symbol": "xyo",
+        "faName": "ایکس‌وای‌او"
+    },
+    {
+        "name": "Useless Coin",
+        "symbol": "useless",
+        "faName": "یوزلس کوین"
+    },
+    {
+        "name": "Non-Playable Coin",
+        "symbol": "npc",
+        "faName": "نان پلیبل کوین"
+    },
+    {
+        "name": "World Mobile Token",
+        "symbol": "wmtx",
+        "faName": "ورلد موبایل توکن"
+    },
+    {
+        "name": "WhiteRock",
+        "symbol": "white",
+        "faName": "وایت راک"
+    },
+    {
+        "name": "QuantixAI",
+        "symbol": "qai",
+        "faName": "کوانتیکس ای‌آی"
+    },
+    {
+        "name": "GEODNET",
+        "symbol": "geod",
+        "faName": "ژئودنت"
+    },
+    {
+        "name": "ZEROBASE",
+        "symbol": "zbt",
+        "faName": "زیروبیس"
+    },
+    {
+        "name": "edgeX",
+        "symbol": "edge",
+        "faName": "اج‌ایکس"
+    },
+    {
+        "name": "Grass",
+        "symbol": "grass",
+        "faName": "گرس"
+    },
+    {
+        "name": "United States Oil Tokenized Fund",
+        "symbol": "usoon",
+        "faName": "نفت دیجیتال"
+    },
+    {
+        "name": "Test",
+        "symbol": "tst",
+        "faName": "تست"
+    },
+    {
+        "name": "Dusk",
+        "symbol": "dusk",
+        "faName": "داسک"
+    },
+    {
+        "name": "OpenLedger",
+        "symbol": "open",
+        "faName": "اوپن‌لجر"
+    },
+    {
+        "name": "Global X Copper Miners Tokenized ETF ",
+        "symbol": "copxon",
+        "faName": "مس دیجیتال"
+    }
+]

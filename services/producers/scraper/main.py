@@ -23,8 +23,6 @@ async def scrape_once(producer):
 
             html = fetch(url)
 
-            tasks = []
-
             event = ensure_trace({
                 "type": "scraped.page",
 
@@ -37,22 +35,16 @@ async def scrape_once(producer):
                 }
             })
 
-            # async kafka send
-            tasks.append(
-                producer.send_and_wait(
-                    "engine-events",
-                    event
-                )
+            await producer.send_and_wait(
+                "engine-events",
+                event
             )
 
-            # wait all sends
-            await asyncio.gather(*tasks)
-
-            print(f"[SCRAPED] {url}")
+            print(f"[SCRAPER] Scraped: {url}")
 
         except Exception as e:
 
-            print(f"[ERROR] {url} -> {e}")
+            print(f"[SCRAPER] Error scraping {url}: {e}")
 
 
 # -------------------------
@@ -72,9 +64,9 @@ async def run():
                 SCRAPE_INTERVAL
             )
 
-    finally:
+    except asyncio.CancelledError:
 
-        await producer.stop()
+        print("[SCRAPER] shutting down")
 
 
 # -------------------------

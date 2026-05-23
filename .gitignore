@@ -192,4 +192,9 @@ pyrightconfig.json
 .history
 .ionide
 
+### Ai patch ###
+# Ignore Agents folders
+.agents
+graphify-out
+
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode

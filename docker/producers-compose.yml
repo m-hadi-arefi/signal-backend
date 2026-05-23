@@ -1,16 +1,16 @@
-version: "3.9"
-
 services:
 
   telegram-producer:
     build: 
       context: . 
       dockerfile: Dockerfile
-    command: sh -c "sleep 10 && watchfiles 'python services/producers/telegram/main.py'"
+    command: watchfiles 'python services/producers/telegram/main.py'
     restart: always
 
     depends_on:
       kafka:
+        condition: service_healthy
+      engine:
         condition: service_healthy
       redis:
         condition: service_started
@@ -25,11 +25,13 @@ services:
     build: 
       context: . 
       dockerfile: Dockerfile
-    command: sh -c "sleep 10 && watchfiles 'python services/producers/scraper/main.py'"
+    command: watchfiles 'python services/producers/scraper/main.py'
     restart: always
 
     depends_on:
       kafka:
+        condition: service_healthy
+      engine:
         condition: service_healthy
       redis:
         condition: service_started
@@ -44,11 +46,13 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    command: sh -c "sleep 10 && watchfiles 'python services/producers/http_api/main.py'"
+    command: watchfiles 'python services/producers/http_api/main.py'
     restart: always
 
     depends_on:
       kafka:
+        condition: service_healthy
+      engine:
         condition: service_healthy
       redis:
         condition: service_started

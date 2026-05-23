@@ -1,23 +1,19 @@
 import time
-
 from core.kafka_client import get_producer
 
-
-# -------------------------
-# DLQ sender (async-safe)
-# -------------------------
 class DLQProducer:
-
     def __init__(self):
         self.producer = None
 
-    async def init(self):
-        self.producer = await get_producer()
+    async def _ensure_producer(self):
+        if not self.producer:
+            self.producer = await get_producer()
 
     async def send_to_dlq(self, event, error, stage):
-
+        await self._ensure_producer()
+        
         dlq_event = {
-            "event": event,
+            "original_event": event,
             "error": str(error),
             "stage": stage,
             "timestamp": time.time()
@@ -29,5 +25,5 @@ class DLQProducer:
         )
 
     async def close(self):
-        if self.producer:
-            await self.producer.stop()
+        # We don't stop the singleton producer here
+        self.producer = None

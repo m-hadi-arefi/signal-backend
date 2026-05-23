@@ -4,11 +4,15 @@ services:
 
   api:
     build: 
-      context: .. 
+      context: . 
       dockerfile: Dockerfile
     command: uvicorn services.api.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
+    networks:
+      - event-net
+    volumes:
+      - .:/app
 
 networks:
   event-net:

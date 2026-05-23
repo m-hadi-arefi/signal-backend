@@ -6,6 +6,7 @@ redis==6.0.0
 
 # PostgreSQL
 psycopg2-binary==2.9.10
+asyncpg==0.30.0
 
 # FastAPI
 fastapi==0.115.12
@@ -18,7 +19,7 @@ pydantic==2.11.4
 python-dotenv==1.1.0
 
 # Telegram
-telethon==1.40.0
+telethon==1.43.2
 
 # Scraping
 requests==2.32.3
@@ -39,3 +40,12 @@ aiokafka==0.14.0
 
 # Dev mode
 watchfiles==1.1.1
+
+# OpenAI
+openai==2.36.0
+
+# http 
+aiohttp==3.13.5
+
+# fuzzy
+RapidFuzz==3.14.5

@@ -1,101 +1,76 @@
 import asyncio
+from typing import Dict, Any, Optional
 
-from core.kafka_client import (
-    get_consumer,
-    get_producer,
-    safe_commit
-)
-from core.config import settings
-from core.logger import log
-from core.kafka_client import start_consumer_with_stability
+from core.worker import BaseWorker
+import os
+from services.workers.ai_worker.helper import AnalysisEngine
 
+class AIWorker(BaseWorker):
+    def __init__(self):
+        super().__init__(
+            service_name="ai_worker",
+            topic="ai-events",
+            group_id="ai-group"
+        )
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def fake_ai(text):
-    return {
-        "summary": text[:20] if text else ""
-    }
+        self.engine = AnalysisEngine(
+            keywords_path=os.path.join(BASE_DIR, "mixed.txt"),
+            coins_path=os.path.join(BASE_DIR, "coins.json")
+        )
 
+    async def start(self):
+        await self.engine.load()
+        await super().start()
 
-# -------------------------
-# process message
-# -------------------------
-async def handle_message(msg, consumer, producer):
+    async def process_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
-    event = msg.value
+        text = event.get("payload", {}).get("text", "")
+        if not text:
+            return None
 
-    try:
+        print("AI Worker:", text)
+        # 1. check analysis
+        is_ok = await self.engine.is_analysis(text)
+        print("AI Worker ok ?:", is_ok)
 
-        if not isinstance(event, dict):
-            return
+        # ❌ NOK → هیچ خروجی نده
+        if not is_ok:
+            return None  # یا event رو برنگردون
+
+        # 2. extract coins
+        coins = await self.engine.extract_coin_symbols(text)
+        print("AI Worker coins ?:", coins)
+
+        # ❌ اگر کوینی نبود هم هیچی نده
+        if not coins:
+            return None
+
+        # 3. build signals
+        signals = [
+            {
+                "signal_type": "general",
+                "asset": coin.upper(),
+                "notes": text
+            }
+            for coin in coins
+        ]
+        print("AI Worker signals ?:", signals)
+
+        event["signals"] = signals
 
         event.setdefault("trace", [])
-
-        text = event.get("text", "")
-
-        # fake ai
-        event["ai"] = fake_ai(text)
-
         if "ai" not in event["trace"]:
             event["trace"].append("ai")
 
-        log(
-            service="ai_worker",
-            level="info",
-            trace_id=event.get("trace_id"),
-            step="ai",
-            event=event
-        )
-
-        # return to engine
-        await producer.send_and_wait(
-            "engine-events",
-            event
-        )
-
-        # commit after success
-        await safe_commit(consumer)
-
-    except Exception as e:
-
-        log(
-            service="ai_worker",
-            level="error",
-            trace_id=event.get("trace_id"),
-            step="ai",
-            event=event,
-            error=str(e)
-        )
+        return event
 
 
-# -------------------------
-# main loop
-# -------------------------
 async def run():
-    print("[ai-worker] started")
-    consumer = get_consumer(
-        "ai-events",
-        "ai-group"
-    )
+    worker = AIWorker()
+    await worker.engine.load()
+    await worker.run()
 
-    producer = await get_producer()
 
-    await start_consumer_with_stability(consumer)
-
-    try:
-
-        async for msg in consumer:
-            await handle_message(
-                msg,
-                consumer,
-                producer
-            )
-
-    finally:
-        await consumer.stop()
-        await producer.stop()
-
-# -------------------------
-# entrypoint
-# -------------------------
 if __name__ == "__main__":
     asyncio.run(run())

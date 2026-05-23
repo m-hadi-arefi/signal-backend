@@ -1,43 +1,32 @@
-
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import asyncpg
+import asyncio
 from core.config import settings
-import time
 
-def get_connection(retries=5, delay=2):
+async def get_connection(retries=5, delay=2):
     for i in range(retries):
         try:
-            print(f"settiing POSTGRES_DB :  {settings.POSTGRES_DB}")
-            print(f"settiing POSTGRES_USER :  {settings.POSTGRES_USER}")
-            print(f"settiing POSTGRES_PASSWORD :  {settings.POSTGRES_PASSWORD}")
-            print(f"settiing POSTGRES_HOST :  {settings.POSTGRES_HOST}")
-            return psycopg2.connect(
-                dbname=settings.POSTGRES_DB,
+            return await asyncpg.connect(
                 user=settings.POSTGRES_USER,
                 password=settings.POSTGRES_PASSWORD,
-                host=settings.POSTGRES_HOST
+                database=settings.POSTGRES_DB,
+                host=settings.POSTGRES_HOST,
+                port=settings.POSTGRES_PORT
             )
-        except psycopg2.OperationalError:
-            print(f"settiing POSTGRES_DB :  {settings.POSTGRES_DB}")
-            print(f"settiing POSTGRES_USER :  {settings.POSTGRES_USER}")
-            print(f"settiing POSTGRES_PASSWORD :  {settings.POSTGRES_PASSWORD}")
-            print(f"settiing POSTGRES_HOST :  {settings.POSTGRES_HOST}")
-            
-            print(f"Postgres not ready, retrying in {delay}s...")
-            time.sleep(delay)
-    raise
+        except Exception as e:
+            print(f"Postgres not ready ({e}), retrying in {delay}s...")
+            await asyncio.sleep(delay)
+    raise RuntimeError("Could not connect to Postgres")
 
 
-def init_db():
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS events (
-            id SERIAL PRIMARY KEY,
-            data JSONB
-        );
-    """)
-
-    conn.commit()
-    conn.close()
+async def init_db():
+    conn = await get_connection()
+    try:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS events (
+                id SERIAL PRIMARY KEY,
+                data JSONB
+            );
+        """)
+        print("[DB] Initialized successfully")
+    finally:
+        await conn.close()

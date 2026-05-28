@@ -1,0 +1,55 @@
+<div class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label fw-medium">نام <span class="text-danger">*</span></label>
+    <input type="text" name="name" class="form-control" required>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">URL <span class="text-danger">*</span></label>
+    <input type="url" name="url" class="form-control" required>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">Data Path <small class="text-muted">(مثال: data.feedData)</small></label>
+    <input type="text" name="data_path" class="form-control font-monospace">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">ID Field <small class="text-muted">(برای dedup)</small></label>
+    <input type="text" name="id_field" class="form-control font-monospace">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">Text Field <small class="text-muted">(dot-notation)</small></label>
+    <input type="text" name="text_field" class="form-control font-monospace">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">Auth Type</label>
+    <select name="auth_type" class="form-select">
+      <option value="">— بدون احراز هویت —</option>
+      <option value="header">Header</option>
+      <option value="query">Query Param</option>
+      <option value="bearer">Bearer Token</option>
+    </select>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">Auth Key</label>
+    <input type="text" name="auth_key" class="form-control font-monospace">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">Auth Value</label>
+    <input type="text" name="auth_value" class="form-control font-monospace">
+  </div>
+  <div class="col-12">
+    <label class="form-label fw-medium">Eval String <small class="text-muted">(lambda روی هر آیتم، خروجی str)</small></label>
+    <textarea name="eval_str" class="form-control font-monospace" rows="2"
+              placeholder='lambda item: f"[{item[&apos;authorName&apos;]}] {item[&apos;content&apos;]}"'></textarea>
+  </div>
+  <div class="col-12">
+    <label class="d-flex align-items-center gap-2 user-select-none" style="cursor:pointer">
+      <input class="form-check-input mt-0" type="checkbox" name="is_active" checked>
+      <span>فعال</span>
+    </label>
+  </div>
+
+  <!-- Test Result Area -->
+  <div class="col-12 test-result d-none">
+    <div class="p-3 rounded-3 border small font-monospace test-result-body"></div>
+  </div>
+</div>

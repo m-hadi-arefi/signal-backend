@@ -84,29 +84,47 @@ class AnalysisEngine:
     async def extract_coin_symbols(self, text: str, threshold: int = 85):
         text_low = text.lower()
         words = self.clean_words(text)
+        words_set = set(words)
 
         result = set()
 
+        def _match_exact(candidate: str) -> bool:
+            """Word-level exact match — avoids substring false positives."""
+            parts = candidate.split()
+            if len(parts) == 1:
+                return candidate in words_set
+            # multi-word phrase: check as contiguous phrase in text
+            return candidate in text_low
+
         def _search():
             for coin in self.coins:
+                name = coin.get("name", "").lower().strip()
+                symbol = coin.get("symbol", "").lower().strip()
+                faname = coin.get("faName", "").lower().strip()
 
-                name = coin.get("name", "").lower()
-                symbol = coin.get("symbol", "").lower()
-                faname = coin.get("faName", "").lower()
+                if not symbol:
+                    continue
 
-                # direct match
-                if symbol in text_low or name in text_low or faname in text_low:
+                # 1. exact word match
+                if _match_exact(symbol) or _match_exact(name) or _match_exact(faname):
                     result.add(symbol)
                     continue
 
-                # fuzzy match
+                # 2. fuzzy match — only on name/faName, never on symbol (too short)
+                #    both the coin name and the text word must be >= 4 chars
+                MIN_LEN = 4
+                matched = False
                 for w in words:
-                    if (
-                        fuzz.ratio(name, w) >= threshold or
-                        fuzz.ratio(faname, w) >= threshold or
-                        fuzz.ratio(symbol, w) >= threshold
-                    ):
+                    if matched:
+                        break
+                    if len(w) < MIN_LEN:
+                        continue
+                    if len(name) >= MIN_LEN and fuzz.ratio(name, w) >= threshold:
                         result.add(symbol)
+                        matched = True
+                    elif len(faname) >= MIN_LEN and fuzz.ratio(faname, w) >= threshold:
+                        result.add(symbol)
+                        matched = True
 
             return list(result)
 

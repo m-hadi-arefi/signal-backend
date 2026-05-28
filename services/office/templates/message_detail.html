@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}جزئیات پیام{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="{{ url_for('messages') }}" class="btn btn-sm btn-outline-secondary mb-3">
+    <i class="bi bi-arrow-right me-1"></i>بازگشت
+  </a>
+  <h4 class="fw-bold mb-1">مسیر پیام</h4>
+  <code class="text-muted">{{ trace_id }}</code>
+</div>
+
+{% if steps %}
+{% set first = steps[0] %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body d-flex flex-wrap gap-4">
+    <div>
+      <div class="text-muted small">نوع</div>
+      <strong>{{ first.event_type if first.get('event_type') else '—' }}</strong>
+    </div>
+    <div>
+      <div class="text-muted small">سورس</div>
+      <strong>{{ first.source_name if first.get('source_name') else '—' }}</strong>
+    </div>
+    <div>
+      <div class="text-muted small">اولین رویداد</div>
+      <strong>{{ first.created_at.strftime('%Y-%m-%d %H:%M:%S') if first.created_at else '—' }}</strong>
+    </div>
+    <div>
+      <div class="text-muted small">تعداد مراحل</div>
+      <strong>{{ steps|length }}</strong>
+    </div>
+  </div>
+</div>
+
+<div class="timeline">
+  {% for step in steps %}
+  <div class="timeline-item
+    {% if step.status == 'completed' %}tl-completed
+    {% elif step.status == 'error' %}tl-error
+    {% elif step.status == 'dropped' %}tl-dropped
+    {% else %}tl-started{% endif %}">
+
+    <div class="timeline-dot">
+      {% if step.status == 'completed' %}
+        <i class="bi bi-check-circle-fill text-success"></i>
+      {% elif step.status == 'error' %}
+        <i class="bi bi-x-circle-fill text-danger"></i>
+      {% elif step.status == 'dropped' %}
+        <i class="bi bi-dash-circle-fill text-warning"></i>
+      {% else %}
+        <i class="bi bi-clock-fill text-secondary"></i>
+      {% endif %}
+    </div>
+
+    <div class="timeline-card card border-0 shadow-sm">
+      <div class="card-body py-2 px-3">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <span class="fw-semibold">{{ step.service }}</span>
+            <span class="text-muted mx-1">/</span>
+            <span class="badge bg-light text-dark border">{{ step.step }}</span>
+            <span class="ms-2
+              {% if step.status == 'completed' %}text-success
+              {% elif step.status == 'error' %}text-danger
+              {% elif step.status == 'dropped' %}text-warning
+              {% else %}text-secondary{% endif %} small fw-medium">
+              {{ step.status }}
+            </span>
+          </div>
+          <span class="text-muted small">
+            {{ step.created_at.strftime('%H:%M:%S.') + '%03d'|format(step.created_at.microsecond // 1000) if step.created_at else '—' }}
+          </span>
+        </div>
+
+        {% if step.error_message %}
+        <div class="mt-2 p-2 bg-danger-subtle rounded small text-danger font-monospace">
+          <i class="bi bi-exclamation-circle me-1"></i>{{ step.error_message }}
+        </div>
+        {% endif %}
+
+        {% if step.ai_signals %}
+        <div class="mt-2">
+          <button class="btn btn-sm btn-outline-info py-0 px-2"
+                  type="button" data-bs-toggle="collapse"
+                  data-bs-target="#ai-{{ step.id }}">
+            <i class="bi bi-robot me-1"></i>خروجی AI
+          </button>
+          <div class="collapse mt-2" id="ai-{{ step.id }}">
+            <pre class="bg-light p-2 rounded small mb-0" style="max-height:300px;overflow:auto">{{ step.ai_signals | tojson(indent=2) }}</pre>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+  هیچ رویدادی برای این trace ID پیدا نشد
+</div>
+{% endif %}
+{% endblock %}

@@ -1,18 +1,62 @@
-version: "3.9"
-
 services:
 
   api:
-    build: 
-      context: . 
+    build:
+      context: ./services/api
       dockerfile: Dockerfile
-    command: uvicorn services.api.main:app --host 0.0.0.0 --port 8000
     ports:
-      - "8000:8000"
+      - "8080:8080"
+    environment:
+      API_PORT: "8080"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: events
+      # Postgres max_connections=200, سایر سرویس‌ها ~55 connection
+      # 200 - 55 - 10(internal) = 135 → 100 برای API (buffer داره)
+      DB_MAX_CONNS: "100"
+      DB_MIN_CONNS: "20"
+      DB_MAX_CONN_LIFETIME: "30m"
+      DB_MAX_CONN_IDLE_TIME: "5m"
+      DB_HEALTH_CHECK_PERIOD: "30s"
+      SERVER_READ_TIMEOUT: "10s"
+      SERVER_WRITE_TIMEOUT: "10s"
+      SERVER_IDLE_TIMEOUT: "60s"
+      CORS_ORIGINS: "*"
+      REDIS_ADDR: "redis:6379"
+      REDIS_PASSWORD: ""
+      REDIS_DB: "0"
+      CACHE_TTL: "30s"
+      GOMAXPROCS: "2"
+      RATE_LIMIT_RPS: "8000"
+      # 1500 concurrent goroutine:
+      # memory: 1500 × 250KB = 375MB + runtime 150MB = 525MB (safe در 1.5GB)
+      # CPU: goroutine‌ها I/O-bound هستن، 2 core کافیه
+      # DB: 99.8% cache hit → فقط ~3 goroutine همزمان به DB می‌رسه
+      MAX_CONCURRENT: "1500"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - event-net
-    volumes:
-      - .:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    cpus: "2.0"
+    mem_limit: 1500m
+    memswap_limit: 1500m
+    sysctls:
+      net.core.somaxconn: 65535
+      net.ipv4.tcp_syncookies: 1
+      net.ipv4.ip_local_port_range: "1024 65535"
+      net.ipv4.tcp_tw_reuse: 1
 
 networks:
   event-net:

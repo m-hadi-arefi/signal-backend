@@ -1,8 +1,8 @@
 services:
 
   telegram-producer:
-    build: 
-      context: . 
+    build:
+      context: .
       dockerfile: Dockerfile
     command: watchfiles 'python services/producers/telegram/main.py'
     restart: always
@@ -22,8 +22,8 @@ services:
       - .:/app
 
   scraper-producer:
-    build: 
-      context: . 
+    build:
+      context: .
       dockerfile: Dockerfile
     command: watchfiles 'python services/producers/scraper/main.py'
     restart: always
@@ -43,7 +43,7 @@ services:
       - .:/app
 
   http-api-producer:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     command: watchfiles 'python services/producers/http_api/main.py'

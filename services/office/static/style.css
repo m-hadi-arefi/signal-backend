@@ -1,0 +1,112 @@
+/* Sidebar */
+.sidebar-link {
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  transition: background 0.15s;
+  color: #a0a8b8 !important;
+}
+.sidebar-link:hover,
+.sidebar-link.active {
+  background: rgba(255,255,255,0.08);
+  color: #fff !important;
+}
+
+/* Stat icon box */
+.stat-icon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Health dot */
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Blinking alive dot */
+.blink-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: blink 1.4s infinite;
+  vertical-align: middle;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
+/* Timeline */
+.timeline {
+  position: relative;
+  padding-right: 2rem;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  right: 0.6rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #dee2e6;
+}
+.timeline-item {
+  position: relative;
+  margin-bottom: 1.25rem;
+}
+.timeline-dot {
+  position: absolute;
+  right: -1.6rem;
+  top: 0.35rem;
+  font-size: 1rem;
+  background: #fff;
+  line-height: 1;
+}
+.timeline-card {
+  margin-right: 0.5rem;
+}
+
+/* Table improvements */
+.table th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6c757d;
+  font-weight: 600;
+}
+.table td {
+  font-size: 0.875rem;
+}
+
+/* Card subtle shadow on hover */
+.card {
+  transition: box-shadow 0.15s;
+}
+.table-hover tbody tr:hover {
+  background-color: rgba(0,0,0,0.02);
+}
+
+/* font-monospace smaller */
+.font-monospace {
+  font-size: 0.8rem;
+}
+
+/* Scrollable pre blocks */
+pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Fix RTL border-start to be visual left in LTR sub-elements */
+[dir="rtl"] .border-start {
+  border-right: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color) !important;
+  border-left: none !important;
+}

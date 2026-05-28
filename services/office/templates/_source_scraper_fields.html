@@ -1,0 +1,54 @@
+<div class="row g-3">
+  <div class="col-12">
+    <label class="form-label fw-medium">نام <span class="text-danger">*</span></label>
+    <input type="text" name="name" class="form-control" required>
+  </div>
+
+  <div class="col-12"><hr class="my-1"><p class="text-muted small mb-1"><i class="bi bi-rss me-1"></i>حالت RSS</p></div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">RSS URL</label>
+    <input type="url" name="rss" class="form-control font-monospace" placeholder="https://example.com/feed">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label fw-medium">Filter Tag</label>
+    <input type="text" name="filter_tag" class="form-control font-monospace" placeholder="category">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label fw-medium">Filter Value <small class="text-muted">(regex)</small></label>
+    <input type="text" name="filter_value" class="form-control font-monospace" placeholder="^Markets$">
+  </div>
+
+  <div class="col-12"><hr class="my-1"><p class="text-muted small mb-1"><i class="bi bi-globe me-1"></i>حالت HTML</p></div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">Listing URL</label>
+    <input type="url" name="listing_url" class="form-control font-monospace">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">Base URL</label>
+    <input type="url" name="base_url" class="form-control font-monospace">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">Box Selector <small class="text-muted">(container هر مقاله)</small></label>
+    <input type="text" name="box_selector" class="form-control font-monospace" placeholder="div.news__item">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label fw-medium">Post Selector <small class="text-muted">(لینک مقاله)</small></label>
+    <input type="text" name="post_selector" class="form-control font-monospace" placeholder='a[href^="/markets/"]'>
+  </div>
+
+  <div class="col-12 d-flex gap-4">
+    <label class="d-flex align-items-center gap-2 user-select-none" style="cursor:pointer">
+      <input class="form-check-input mt-0" type="checkbox" name="is_ssr">
+      <span>SSR (Next.js)</span>
+    </label>
+    <label class="d-flex align-items-center gap-2 user-select-none" style="cursor:pointer">
+      <input class="form-check-input mt-0" type="checkbox" name="is_active" checked>
+      <span>فعال</span>
+    </label>
+  </div>
+
+  <!-- Test Result Area -->
+  <div class="col-12 test-result d-none">
+    <div class="p-3 rounded-3 border small font-monospace test-result-body"></div>
+  </div>
+</div>

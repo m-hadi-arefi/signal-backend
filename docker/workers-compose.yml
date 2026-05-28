@@ -1,6 +1,6 @@
 services:
   engine:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     command:  watchfiles 'python services/engine/main.py'
@@ -22,7 +22,7 @@ services:
       - .:/app
 
   html-worker:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     command:  watchfiles 'python services/workers/html_cleaner/main.py'
@@ -44,7 +44,7 @@ services:
       - .:/app
 
   ai-worker:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     command:  watchfiles 'python services/workers/ai_worker/main.py'
@@ -66,7 +66,7 @@ services:
       - .:/app
 
   serializer:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     command:  watchfiles 'python services/workers/serializer/main.py'
@@ -88,7 +88,7 @@ services:
       - .:/app
 
   final-store:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     command:  watchfiles 'python services/workers/final_store/main.py'
@@ -108,6 +108,33 @@ services:
       - event-net
     volumes:
       - .:/app
+
+  price-fetcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:  watchfiles 'python services/workers/price_fetcher/main.py'
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/worker_ready"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+    networks:
+      - event-net
+    volumes:
+      - .:/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONPATH=/app
 
 networks:
   event-net:

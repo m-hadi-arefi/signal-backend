@@ -8,60 +8,53 @@ from shared.enums.workflows import WORKFLOWS
 
 from services.producers.telegram.client import client, PHONE
 
-
 KAFKA_TOPIC = "engine-events"
 
 
-# -------------------------
-# telegram client
-# -------------------------
-
-
-
-# -------------------------
-# handler
-# -------------------------
 async def handle_message(event, producer):
-
     try:
         message = event.message
 
+        # Resolve channel username if available, fall back to numeric chat_id
+        chat = await event.get_chat()
+        channel_id = str(event.chat_id)
+        channel_handle = (
+            f"@{chat.username}" if getattr(chat, "username", None) else channel_id
+        )
+
         event_data = ensure_trace({
             "type": "telegram.message",
-
             "pipeline": WORKFLOWS["telegram_pipeline"],
+
+            # Source metadata — required by FinalEventSchema
+            "source": {
+                "type":     "telegram",
+                "provider": "telegram",
+                "channel":  channel_handle,
+            },
 
             "payload": {
                 "message_id": message.id,
-                "text": message.message,
-                "chat_id": event.chat_id,
-                "sender_id": message.sender_id,
-                "date": str(message.date)
-            }
+                "text":       message.message,
+                "chat_id":    event.chat_id,
+                "sender_id":  message.sender_id,
+                "date":       str(message.date),
+            },
         })
 
-        await producer.send_and_wait(
-            KAFKA_TOPIC,
-            event_data
-        )
-
-        print(f"[TELEGRAM] sent message {message.id}")
+        await producer.send_and_wait(KAFKA_TOPIC, event_data)
+        print(f"[TELEGRAM] sent message {message.id} from {channel_handle}")
 
     except Exception as e:
         print(f"[TELEGRAM] error: {e}")
 
 
-# -------------------------
-# main
-# -------------------------
 async def run():
-
     print("[TELEGRAM] starting producer...")
 
     producer = await get_producer()
 
     await client.start()
-
     print("[TELEGRAM] connected")
 
     @client.on(events.NewMessage)
@@ -71,8 +64,5 @@ async def run():
     await client.run_until_disconnected()
 
 
-# -------------------------
-# entrypoint
-# -------------------------
 if __name__ == "__main__":
     asyncio.run(run())

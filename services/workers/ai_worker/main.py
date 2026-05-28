@@ -1,7 +1,9 @@
 import asyncio
+import requests
 from typing import Dict, Any, Optional
 
 from core.worker import BaseWorker
+from core.redis import get_redis
 import os
 from services.workers.ai_worker.helper import AnalysisEngine
 
@@ -18,6 +20,7 @@ class AIWorker(BaseWorker):
             keywords_path=os.path.join(BASE_DIR, "mixed.txt"),
             coins_path=os.path.join(BASE_DIR, "coins.json")
         )
+        self.redis = get_redis()
 
     async def start(self):
         await self.engine.load()
@@ -43,27 +46,68 @@ class AIWorker(BaseWorker):
         print("AI Worker coins ?:", coins)
 
         # ❌ اگر کوینی نبود هم هیچی نده
+
         if not coins:
             return None
 
-        # 3. build signals
-        signals = [
-            {
-                "signal_type": "general",
-                "asset": coin.upper(),
-                "notes": text
-            }
-            for coin in coins
-        ]
-        print("AI Worker signals ?:", signals)
+        # 3. append current prices to the prompt
+        price_context = self._build_price_context(coins)
+        prompt = text + price_context if price_context else text
 
-        event["signals"] = signals
+        # 4. send to AI for full analysis
+        ai_result = await asyncio.to_thread(self._call_ai_parser, prompt)
+        print("AI Worker ai_result ?:", ai_result)
+
+        if ai_result is None:
+            return None
+
+        if isinstance(ai_result, list):
+            event["signals"] = ai_result
+            event["ai_analysis"] = {"signals": ai_result}
+        else:
+            event["signals"] = ai_result.get("signals", [])
+            event["ai_analysis"] = ai_result
 
         event.setdefault("trace", [])
         if "ai" not in event["trace"]:
             event["trace"].append("ai")
 
         return event
+
+
+    def _build_price_context(self, coins: list) -> str:
+        lines = []
+        for symbol in coins:
+            try:
+                irt_price = self.redis.get(f"{symbol}irt")
+                if irt_price:
+                    lines.append(f"now price {symbol.upper()} = {irt_price} IRT")
+            except Exception:
+                pass
+            try:
+                usdt_price = self.redis.get(f"{symbol}usdt")
+                if usdt_price:
+                    lines.append(f"now price {symbol.upper()} = {usdt_price} USDT")
+            except Exception:
+                pass
+        if not lines:
+            return ""
+        return "\n\n" + "\n".join(lines)
+
+    def _call_ai_parser(self, text: str) -> Optional[Dict[str, Any]]:
+        url = os.getenv("AI_PARSER_URL", "http://claude-gateway:8000/parse")
+        try:
+            response = requests.post(
+                url,
+                json={"prompt": text},
+                headers={"Content-Type": "application/json"},
+                timeout=60
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"AI Parser error: {e}")
+            return None
 
 
 async def run():

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\1106\\\\signal-project\\\\clude-ai\\\\app\\\\.claude\\\\agents\\\\\" -Recurse -Filter \"*.md\" | Select-Object FullName)"
+    ]
+  }
+}

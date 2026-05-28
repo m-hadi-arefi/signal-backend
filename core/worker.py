@@ -10,6 +10,10 @@ from core.kafka_client import (
 )
 from core.logger import log
 from core.dlq import DLQProducer
+from core.pipeline_logger import log_pipeline
+
+# Services that return None from process_event as a normal "completed" signal
+_NONE_MEANS_COMPLETED = {"engine", "final_store"}
 
 # Sentinel file for Docker healthchecks
 HEALTHCHECK_FILE = "/tmp/worker_ready"
@@ -56,21 +60,40 @@ class BaseWorker(abc.ABC):
         """
         pass
 
+    def _current_step_name(self) -> str:
+        mapping = {
+            "engine": "engine",
+            "html_cleaner": "html",
+            "ai_worker": "ai",
+            "serializer": "serialize",
+            "final_store": "final",
+        }
+        return mapping.get(self.service_name, self.service_name)
+
     async def handle_message(self, msg):
         event = msg.value
         trace_id = event.get("trace_id") if isinstance(event, dict) else "unknown"
 
+        await log_pipeline(trace_id, self.service_name, self._current_step_name(), "started", event)
+
         try:
             if not isinstance(event, dict):
                 log(self.service_name, "error", trace_id, "invalid event type", event)
+                await log_pipeline(trace_id, self.service_name, self._current_step_name(),
+                                   "error", event, "invalid event type (not a dict)")
                 await safe_commit(self.consumer)
                 return
 
             # Process the event
             result_event = await self.process_event(event)
 
-            # If the worker returned an event, send it back to the engine
-            if result_event:
+            if result_event is None:
+                if self.service_name in _NONE_MEANS_COMPLETED:
+                    await log_pipeline(trace_id, self.service_name, self._current_step_name(), "completed", event)
+                else:
+                    await log_pipeline(trace_id, self.service_name, self._current_step_name(), "dropped", event)
+            else:
+                await log_pipeline(trace_id, self.service_name, self._current_step_name(), "completed", result_event)
                 await self.producer.send_and_wait("engine-events", result_event)
 
             # Commit after success
@@ -78,7 +101,9 @@ class BaseWorker(abc.ABC):
 
         except Exception as e:
             log(self.service_name, "error", trace_id, f"Processing failed: {str(e)}", event)
-            
+            await log_pipeline(trace_id, self.service_name, self._current_step_name(),
+                               "error", event, str(e))
+
             # Send to DLQ
             try:
                 await self.dlq.send_to_dlq(event, e, self.service_name)

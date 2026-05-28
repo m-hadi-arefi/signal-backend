@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+{% block title %}مدیریت سورس‌ها{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h4 class="mb-0 fw-bold">مدیریت سورس‌ها</h4>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3" id="sourceTabs">
+  <li class="nav-item">
+    <a class="nav-link {% if active_tab == 'http-api' %}active{% endif %}"
+       href="{{ url_for('sources_http_api') }}">
+      <i class="bi bi-cloud-download me-1"></i>HTTP API Sources
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if active_tab == 'scraper' %}active{% endif %}"
+       href="{{ url_for('sources_scraper') }}">
+      <i class="bi bi-globe me-1"></i>Scraper Sources
+    </a>
+  </li>
+</ul>
+
+{% if active_tab == 'http-api' %}
+<!-- ───────────── HTTP API Sources ───────────── -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">HTTP API Sources</span>
+    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addHttpModal">
+      <i class="bi bi-plus-lg me-1"></i>افزودن سورس
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>نام</th><th>URL</th><th>Data Path</th><th>Auth</th><th>وضعیت</th><th>عملیات</th></tr>
+      </thead>
+      <tbody>
+        {% for s in http_sources %}
+        <tr>
+          <td class="text-muted small">{{ s.id }}</td>
+          <td class="fw-medium">{{ s.name }}</td>
+          <td class="small" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <a href="{{ s.url }}" target="_blank" class="text-decoration-none text-muted">{{ s.url[:55] }}{% if s.url|length > 55 %}…{% endif %}</a>
+          </td>
+          <td><code class="small">{{ s.data_path or '—' }}</code></td>
+          <td>
+            {% if s.auth_type %}<span class="badge bg-info-subtle text-info">{{ s.auth_type }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if s.is_active %}
+              <span class="badge bg-success-subtle text-success"><i class="bi bi-circle-fill me-1" style="font-size:.45rem"></i>فعال</span>
+            {% else %}
+              <span class="badge bg-secondary-subtle text-secondary">غیرفعال</span>
+            {% endif %}
+          </td>
+          <td class="text-nowrap">
+            <button class="btn btn-sm btn-outline-secondary me-1 btn-edit-http"
+                    data-bs-toggle="modal" data-bs-target="#editHttpModal"
+                    data-id="{{ s.id }}"
+                    data-name="{{ s.name }}"
+                    data-url="{{ s.url }}"
+                    data-data_path="{{ s.data_path or '' }}"
+                    data-id_field="{{ s.id_field or '' }}"
+                    data-text_field="{{ s.text_field or '' }}"
+                    data-eval_str="{{ s.eval_str or '' }}"
+                    data-auth_type="{{ s.auth_type or '' }}"
+                    data-auth_key="{{ s.auth_key or '' }}"
+                    data-auth_value="{{ s.auth_value or '' }}"
+                    data-is_active="{{ 'true' if s.is_active else 'false' }}">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="POST" action="{{ url_for('sources_http_api_delete', sid=s.id) }}"
+                  class="d-inline" onsubmit="return confirm('این سورس حذف شود؟')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">سورسی تعریف نشده</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add HTTP Modal -->
+<div class="modal fade" id="addHttpModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('sources_http_api_add') }}" id="addHttpForm">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>افزودن HTTP API Source</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% include "_source_http_fields.html" %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-info btn-test-http" data-form="addHttpForm">
+            <i class="bi bi-play-circle me-1"></i>تست سورس
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="submit" class="btn btn-primary">ذخیره</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit HTTP Modal -->
+<div class="modal fade" id="editHttpModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="POST" id="editHttpForm">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>ویرایش HTTP API Source</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% include "_source_http_fields.html" %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-info btn-test-http" data-form="editHttpForm">
+            <i class="bi bi-play-circle me-1"></i>تست سورس
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="submit" class="btn btn-primary">ذخیره</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if active_tab == 'scraper' %}
+<!-- ───────────── Scraper Sources ───────────── -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">Scraper Sources</span>
+    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addScraperModal">
+      <i class="bi bi-plus-lg me-1"></i>افزودن سورس
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>نام</th><th>نوع</th><th>URL</th><th>فیلتر</th><th>وضعیت</th><th>عملیات</th></tr>
+      </thead>
+      <tbody>
+        {% for s in scraper_sources %}
+        <tr>
+          <td class="text-muted small">{{ s.id }}</td>
+          <td class="fw-medium">{{ s.name }}</td>
+          <td>
+            {% if s.rss %}
+              <span class="badge" style="background:#fff3e0;color:#e65100">RSS</span>
+            {% else %}
+              <span class="badge" style="background:#f3e5f5;color:#6a1b9a">HTML</span>
+            {% endif %}
+            {% if s.is_ssr %}<span class="badge bg-secondary-subtle text-secondary ms-1">SSR</span>{% endif %}
+          </td>
+          <td class="small text-muted" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ (s.rss or s.listing_url or '—')[:45] }}
+          </td>
+          <td class="small">{{ s.filter_value or '—' }}</td>
+          <td>
+            {% if s.is_active %}
+              <span class="badge bg-success-subtle text-success"><i class="bi bi-circle-fill me-1" style="font-size:.45rem"></i>فعال</span>
+            {% else %}
+              <span class="badge bg-secondary-subtle text-secondary">غیرفعال</span>
+            {% endif %}
+          </td>
+          <td class="text-nowrap">
+            <button class="btn btn-sm btn-outline-secondary me-1 btn-edit-scraper"
+                    data-bs-toggle="modal" data-bs-target="#editScraperModal"
+                    data-id="{{ s.id }}"
+                    data-name="{{ s.name }}"
+                    data-rss="{{ s.rss or '' }}"
+                    data-filter_tag="{{ s.filter_tag or '' }}"
+                    data-filter_value="{{ s.filter_value or '' }}"
+                    data-listing_url="{{ s.listing_url or '' }}"
+                    data-base_url="{{ s.base_url or '' }}"
+                    data-box_selector="{{ s.box_selector or '' }}"
+                    data-post_selector="{{ s.post_selector or '' }}"
+                    data-is_ssr="{{ 'true' if s.is_ssr else 'false' }}"
+                    data-is_active="{{ 'true' if s.is_active else 'false' }}">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="POST" action="{{ url_for('sources_scraper_delete', sid=s.id) }}"
+                  class="d-inline" onsubmit="return confirm('این سورس حذف شود؟')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">سورسی تعریف نشده</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Scraper Modal -->
+<div class="modal fade" id="addScraperModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('sources_scraper_add') }}" id="addScraperForm">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>افزودن Scraper Source</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% include "_source_scraper_fields.html" %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-info btn-test-scraper" data-form="addScraperForm">
+            <i class="bi bi-play-circle me-1"></i>تست سورس
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="submit" class="btn btn-primary">ذخیره</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Scraper Modal -->
+<div class="modal fade" id="editScraperModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="POST" id="editScraperForm">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>ویرایش Scraper Source</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% include "_source_scraper_fields.html" %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-info btn-test-scraper" data-form="editScraperForm">
+            <i class="bi bi-play-circle me-1"></i>تست سورس
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="submit" class="btn btn-primary">ذخیره</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Populate Edit HTTP modal ───────────────────────────────────────────────
+document.querySelectorAll('.btn-edit-http').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const form = document.getElementById('editHttpForm');
+    form.action = '/sources/http-api/' + btn.dataset.id + '/edit';
+    const fields = ['name','url','data_path','id_field','text_field','eval_str','auth_type','auth_key','auth_value'];
+    fields.forEach(f => {
+      const el = form.querySelector('[name="' + f + '"]');
+      if (el) el.value = btn.dataset[f] || '';
+    });
+    const cb = form.querySelector('[name="is_active"]');
+    if (cb) cb.checked = btn.dataset.is_active === 'true';
+    clearTestResult(form);
+  });
+});
+
+// ── Populate Edit Scraper modal ────────────────────────────────────────────
+document.querySelectorAll('.btn-edit-scraper').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const form = document.getElementById('editScraperForm');
+    form.action = '/sources/scraper/' + btn.dataset.id + '/edit';
+    const fields = ['name','rss','filter_tag','filter_value','listing_url','base_url','box_selector','post_selector'];
+    fields.forEach(f => {
+      const el = form.querySelector('[name="' + f + '"]');
+      if (el) el.value = btn.dataset[f] || '';
+    });
+    const ssrCb  = form.querySelector('[name="is_ssr"]');
+    const actCb  = form.querySelector('[name="is_active"]');
+    if (ssrCb)  ssrCb.checked  = btn.dataset.is_ssr === 'true';
+    if (actCb)  actCb.checked  = btn.dataset.is_active === 'true';
+    clearTestResult(form);
+  });
+});
+
+// ── Test HTTP API source ───────────────────────────────────────────────────
+document.querySelectorAll('.btn-test-http').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const form = document.getElementById(btn.dataset.form);
+    const payload = {
+      url:       form.querySelector('[name=url]')?.value,
+      data_path: form.querySelector('[name=data_path]')?.value,
+      id_field:  form.querySelector('[name=id_field]')?.value,
+      text_field:form.querySelector('[name=text_field]')?.value,
+      eval_str:  form.querySelector('[name=eval_str]')?.value,
+      auth_type: form.querySelector('[name=auth_type]')?.value,
+      auth_key:  form.querySelector('[name=auth_key]')?.value,
+      auth_value:form.querySelector('[name=auth_value]')?.value,
+    };
+    await runTest(btn, form, '/api/test/http-api', payload, renderHttpResult);
+  });
+});
+
+// ── Test Scraper source ────────────────────────────────────────────────────
+document.querySelectorAll('.btn-test-scraper').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const form = document.getElementById(btn.dataset.form);
+    const payload = {
+      rss:          form.querySelector('[name=rss]')?.value,
+      filter_tag:   form.querySelector('[name=filter_tag]')?.value,
+      filter_value: form.querySelector('[name=filter_value]')?.value,
+      listing_url:  form.querySelector('[name=listing_url]')?.value,
+      base_url:     form.querySelector('[name=base_url]')?.value,
+      post_selector:form.querySelector('[name=post_selector]')?.value,
+    };
+    await runTest(btn, form, '/api/test/scraper', payload, renderScraperResult);
+  });
+});
+
+// ── Shared test runner ─────────────────────────────────────────────────────
+async function runTest(btn, form, endpoint, payload, renderFn) {
+  const resultWrap = form.querySelector('.test-result');
+  const resultBody = form.querySelector('.test-result-body');
+  resultWrap.classList.remove('d-none');
+  resultBody.className = 'p-3 rounded-3 border small font-monospace test-result-body bg-light text-muted';
+  resultBody.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>در حال تست…';
+  btn.disabled = true;
+
+  try {
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    renderFn(resultBody, data);
+  } catch (e) {
+    resultBody.className = 'p-3 rounded-3 border border-danger small font-monospace test-result-body bg-danger-subtle';
+    resultBody.innerHTML = '<i class="bi bi-x-circle-fill text-danger me-1"></i>خطای شبکه: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderHttpResult(el, d) {
+  if (!d.ok) {
+    el.className = 'p-3 rounded-3 border border-danger small font-monospace test-result-body bg-danger-subtle';
+    el.innerHTML = '<i class="bi bi-x-circle-fill text-danger me-1"></i><strong>خطا:</strong> ' + escHtml(d.error);
+    return;
+  }
+  el.className = 'p-3 rounded-3 border border-success small font-monospace test-result-body bg-success-subtle';
+  let html = '<i class="bi bi-check-circle-fill text-success me-1"></i><strong>موفق</strong>';
+  html += ' &nbsp;|&nbsp; HTTP ' + d.status_code;
+  html += ' &nbsp;|&nbsp; <strong>' + d.item_count + '</strong> آیتم پیدا شد';
+  if (d.sample) {
+    html += '<hr class="my-2"><div class="text-muted" style="font-size:.78rem">نمونه متن اول:</div>';
+    html += '<div class="mt-1 p-2 bg-white rounded border" style="white-space:pre-wrap;max-height:120px;overflow:auto">'
+          + escHtml(d.sample) + '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderScraperResult(el, d) {
+  if (!d.ok) {
+    el.className = 'p-3 rounded-3 border border-danger small font-monospace test-result-body bg-danger-subtle';
+    el.innerHTML = '<i class="bi bi-x-circle-fill text-danger me-1"></i><strong>خطا:</strong> ' + escHtml(d.error);
+    return;
+  }
+  el.className = 'p-3 rounded-3 border border-success small font-monospace test-result-body bg-success-subtle';
+  let html = '<i class="bi bi-check-circle-fill text-success me-1"></i><strong>موفق</strong>';
+  html += ' &nbsp;|&nbsp; حالت: <strong>' + d.mode + '</strong>';
+  if (d.item_count !== null && d.item_count !== undefined)
+    html += ' &nbsp;|&nbsp; <strong>' + d.item_count + '</strong> آیتم پیدا شد';
+  if (d.filtered_count !== null && d.filtered_count !== undefined)
+    html += ' &nbsp;|&nbsp; بعد از فیلتر: <strong>' + d.filtered_count + '</strong>';
+
+  if (d.mode === 'RSS' && d.sample_titles && d.sample_titles.length) {
+    html += '<hr class="my-2"><div class="text-muted" style="font-size:.78rem">عناوین نمونه:</div><ul class="mb-0 mt-1">';
+    d.sample_titles.forEach(t => { html += '<li>' + escHtml(t) + '</li>'; });
+    html += '</ul>';
+  }
+  if (d.mode === 'HTML' && d.sample_urls && d.sample_urls.length) {
+    html += '<hr class="my-2"><div class="text-muted" style="font-size:.78rem">لینک‌های نمونه:</div><ul class="mb-0 mt-1">';
+    d.sample_urls.forEach(u => { html += '<li><a href="' + escHtml(u) + '" target="_blank" class="text-break">' + escHtml(u) + '</a></li>'; });
+    html += '</ul>';
+  }
+  el.innerHTML = html;
+}
+
+function clearTestResult(form) {
+  const wrap = form.querySelector('.test-result');
+  if (wrap) wrap.classList.add('d-none');
+}
+
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,34 @@
+{
+  "symbol": "SOL",
+  "scenarios": [
+    {
+      "direction": "up",
+      "entry": 87.83,
+      "trigger": "break_up",
+      "tp": [98, 117],
+      "sl": 82.65,
+      "reason": "دلیل",
+      "timeframe": "1d"
+    },
+    {
+      "type": "fixnumber|range",
+      "direction": "down",
+      "entry": 82.65,
+      "trigger": "condiention_down",
+      "tp": [76],
+      "sl": 87.83,
+      "reason": "دلیل",
+      "timeframe": "1d"
+    }
+  ],
+  "expiretime": "1d"
+}
+ی درصدی بالا پتیین نصبت به قیمت اون ارز
+
+
+
+
+
+
+
+

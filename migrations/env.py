@@ -4,8 +4,9 @@ from logging.config import fileConfig
 from shared.database.base import Base
 from core.config import settings
 
-# Modles list to be imported
-import shared.models.events
+# Models that contribute tables to the migration target metadata
+import shared.models.sources
+import shared.models.signals
 
 
 config = context.config

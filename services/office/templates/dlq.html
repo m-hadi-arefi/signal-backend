@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}DLQ / خطاها{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h4 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>DLQ / خطاها</h4>
+  <span class="badge bg-danger">{{ messages|length }} رویداد</span>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Trace ID</th>
+          <th>سورس</th>
+          <th>نوع</th>
+          <th>سرویس</th>
+          <th>مرحله</th>
+          <th>وضعیت</th>
+          <th>خطا</th>
+          <th>زمان</th>
+          <th>عملیات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for msg in messages %}
+        <tr>
+          <td>
+            <a href="{{ url_for('message_detail', trace_id=msg.trace_id) }}"
+               class="font-monospace small text-decoration-none">
+              {{ msg.trace_id[:12] }}…
+            </a>
+          </td>
+          <td class="small">{{ msg.source_name or '—' }}</td>
+          <td>
+            {% if msg.event_type == 'http_api.response' %}
+              <span class="badge" style="background:#e3f2fd;color:#1565c0">HTTP API</span>
+            {% elif msg.event_type == 'scraped.page' %}
+              <span class="badge" style="background:#f3e5f5;color:#6a1b9a">Scraped</span>
+            {% elif msg.event_type == 'telegram.message' %}
+              <span class="badge" style="background:#e8f5e9;color:#2e7d32">Telegram</span>
+            {% else %}
+              <span class="text-muted small">{{ msg.event_type or '—' }}</span>
+            {% endif %}
+          </td>
+          <td><span class="badge bg-secondary-subtle text-secondary">{{ msg.service or '—' }}</span></td>
+          <td><code class="small">{{ msg.step or '—' }}</code></td>
+          <td>
+            {% if msg.status == 'error' %}
+              <span class="badge bg-danger-subtle text-danger"><i class="bi bi-x-circle me-1"></i>خطا</span>
+            {% else %}
+              <span class="badge bg-warning-subtle text-warning"><i class="bi bi-dash-circle me-1"></i>دراپ</span>
+            {% endif %}
+          </td>
+          <td class="small text-danger" style="max-width:200px">
+            {% if msg.error_message %}
+              <span title="{{ msg.error_message }}">
+                {{ msg.error_message[:60] }}{% if msg.error_message|length > 60 %}…{% endif %}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="small text-muted text-nowrap">
+            {{ msg.created_at.strftime('%m-%d %H:%M') if msg.created_at else '—' }}
+          </td>
+          <td>
+            {% if msg.status == 'error' and msg.event_data %}
+            <form method="POST" action="{{ url_for('dlq_replay', log_id=msg.id) }}"
+                  onsubmit="return confirm('این پیام مجدداً از ابتدا پردازش می‌شود. ادامه می‌دهید؟')">
+              <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-arrow-repeat me-1"></i>Replay
+              </button>
+            </form>
+            {% else %}
+              <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted py-5">
+            <i class="bi bi-check-circle fs-3 d-block mb-2 text-success"></i>
+            هیچ خطا یا دراپی ثبت نشده
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

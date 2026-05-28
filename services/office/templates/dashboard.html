@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}داشبورد{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h4 class="mb-0 fw-bold">داشبورد</h4>
+  <small class="text-muted"><i class="bi bi-calendar3 me-1"></i>{{ now }}</small>
+</div>
+
+{% if stats.get('error') %}
+  <div class="alert alert-danger">خطا در اتصال به پایگاه داده: {{ stats.error }}</div>
+{% else %}
+
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon bg-primary-subtle rounded-3 p-3">
+          <i class="bi bi-envelope-fill text-primary fs-4"></i>
+        </div>
+        <div>
+          <div class="text-muted small">کل پیام‌های امروز</div>
+          <div class="fs-3 fw-bold">{{ stats.total_today }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon bg-success-subtle rounded-3 p-3">
+          <i class="bi bi-check-circle-fill text-success fs-4"></i>
+        </div>
+        <div>
+          <div class="text-muted small">تکمیل‌شده</div>
+          <div class="fs-3 fw-bold text-success">{{ stats.by_status.get('completed', 0) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon bg-warning-subtle rounded-3 p-3">
+          <i class="bi bi-dash-circle-fill text-warning fs-4"></i>
+        </div>
+        <div>
+          <div class="text-muted small">دراپ‌شده</div>
+          <div class="fs-3 fw-bold text-warning">{{ stats.by_status.get('dropped', 0) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon bg-danger-subtle rounded-3 p-3">
+          <i class="bi bi-x-circle-fill text-danger fs-4"></i>
+        </div>
+        <div>
+          <div class="text-muted small">خطا</div>
+          <div class="fs-3 fw-bold text-danger">{{ stats.by_status.get('error', 0) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Per-Source Table -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-bottom">
+        <span class="fw-semibold"><i class="bi bi-bar-chart-fill me-2 text-primary"></i>پیام‌ها به تفکیک سورس</span>
+      </div>
+      <div class="card-body p-0">
+        {% if stats.by_source %}
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr><th>سورس</th><th>تعداد امروز</th><th style="width:40%">نمودار</th></tr>
+          </thead>
+          <tbody>
+            {% set max_cnt = stats.by_source[0].cnt if stats.by_source else 1 %}
+            {% for row in stats.by_source %}
+            <tr>
+              <td class="small">{{ row.source_name }}</td>
+              <td><span class="badge bg-primary-subtle text-primary">{{ row.cnt }}</span></td>
+              <td>
+                <div class="progress" style="height:8px">
+                  <div class="progress-bar bg-primary" style="width:{{ (row.cnt / max_cnt * 100)|int }}%"></div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4 small">هنوز داده‌ای ثبت نشده</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Health Grid -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-heart-pulse me-2 text-danger"></i>وضعیت سرویس‌ها</span>
+        <a href="{{ url_for('health_page') }}" class="text-muted small">همه <i class="bi bi-arrow-left-short"></i></a>
+      </div>
+      <div class="card-body">
+        <div class="row g-2">
+          {% for svc, alive in health.items() %}
+          <div class="col-6">
+            <div class="d-flex align-items-center gap-2 p-2 rounded-2 {% if alive %}bg-success-subtle{% else %}bg-danger-subtle{% endif %}">
+              <span class="health-dot {% if alive %}bg-success{% else %}bg-danger{% endif %}"></span>
+              <span class="small fw-medium {% if alive %}text-success{% else %}text-danger{% endif %}">{{ svc }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Errors -->
+{% if stats.recent_errors %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom">
+    <span class="fw-semibold"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>آخرین خطاها</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead class="table-light">
+        <tr><th>Trace ID</th><th>سورس</th><th>سرویس</th><th>خطا</th><th>زمان</th></tr>
+      </thead>
+      <tbody>
+        {% for err in stats.recent_errors %}
+        <tr>
+          <td><a href="{{ url_for('message_detail', trace_id=err.trace_id) }}" class="font-monospace small">{{ err.trace_id[:12] }}...</a></td>
+          <td class="small">{{ err.source_name or '—' }}</td>
+          <td><span class="badge bg-secondary-subtle text-secondary">{{ err.service }}</span></td>
+          <td class="small text-danger">{{ (err.error_message or '')[:60] }}{% if err.error_message and err.error_message|length > 60 %}…{% endif %}</td>
+          <td class="small text-muted">{{ err.created_at.strftime('%H:%M:%S') if err.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Rate bar -->
+<div class="mt-4 p-3 bg-white rounded-3 shadow-sm d-flex align-items-center gap-3">
+  <span class="text-muted small">نرخ موفقیت امروز:</span>
+  <div class="progress flex-grow-1" style="height:10px">
+    <div class="progress-bar bg-success" id="success-bar" style="width:{{ stats.success_rate }}%"></div>
+  </div>
+  <span class="fw-bold text-success" id="success-rate">{{ stats.success_rate }}%</span>
+  <span class="text-muted small">| ساعت اخیر: <span id="last-hour">{{ stats.last_hour }}</span> پیام</span>
+  <span class="text-muted small ms-2" id="refresh-time"></span>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function refreshStats() {
+  fetch("{{ url_for('api_dashboard_stats') }}")
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      document.getElementById('total-today') && (document.getElementById('total-today').textContent = d.total_today);
+      document.getElementById('last-hour') && (document.getElementById('last-hour').textContent = d.last_hour);
+      const rate = d.success_rate;
+      const bar = document.getElementById('success-bar');
+      const rateEl = document.getElementById('success-rate');
+      if (bar) bar.style.width = rate + '%';
+      if (rateEl) rateEl.textContent = rate + '%';
+      const ts = new Date().toLocaleTimeString('fa-IR');
+      const el = document.getElementById('refresh-time');
+      if (el) el.textContent = '| بروز: ' + ts;
+    })
+    .catch(() => {});
+}
+setInterval(refreshStats, 30000);
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.querySelector('.fs-3.fw-bold');
+  if (el) el.id = 'total-today';
+});
+</script>
+{% endblock %}

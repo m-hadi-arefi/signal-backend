@@ -2,6 +2,7 @@ import asyncio
 
 from core.kafka_client import get_producer
 from core.trace import ensure_trace
+from core.text import clean_text
 from services.producers.scraper.detector import extract_post_links
 from services.producers.scraper.fetcher import fetch
 from services.producers.scraper.parser import parse_content
@@ -54,6 +55,7 @@ async def process_source(source: dict, producer, tracker: SeenTracker):
                     post_html = fetch(url)
                     content   = parse_content(post_html)
 
+                raw_text = content["text"]
                 event = ensure_trace({
                     "type":     "scraped.page",
                     "pipeline": WORKFLOWS["text_pipeline"],
@@ -66,10 +68,11 @@ async def process_source(source: dict, producer, tracker: SeenTracker):
                     },
 
                     "payload": {
-                        "url":     url,
-                        "source":  name,
-                        "title":   content["title"],
-                        "payload": content["text"],
+                        "url":      url,
+                        "source":   name,
+                        "title":    content["title"],
+                        "real_text": raw_text,
+                        "text":     clean_text(raw_text),
                     },
                 })
 

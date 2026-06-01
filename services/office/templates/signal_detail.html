@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}ویرایش سیگنال — {{ signal.symbol }}{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="mb-4 d-flex align-items-center justify-content-between">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{{ url_for('signals_page') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-right me-1"></i>بازگشت
+    </a>
+    <div>
+      <h5 class="fw-bold mb-0">سیگنال — <span class="text-success">{{ signal.symbol }}</span></h5>
+      <code class="text-muted small">{{ signal.trace_id }}</code>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('message_detail', trace_id=signal.trace_id) }}" class="btn btn-sm btn-outline-info">
+      <i class="bi bi-diagram-3 me-1"></i>مسیر پیام
+    </a>
+    <form method="POST" action="{{ url_for('signal_delete', signal_id=signal.id) }}"
+          onsubmit="return confirm('سیگنال و تمام سناریوهای آن حذف شود؟ این عمل برگشت‌پذیر نیست.')">
+      <button type="submit" class="btn btn-sm btn-danger">
+        <i class="bi bi-trash me-1"></i>حذف سیگنال
+      </button>
+    </form>
+  </div>
+</div>
+
+{% set src = signal.source if signal.source is mapping else {} %}
+{% set src_type = src.get('type', '') %}
+
+<!-- ═══════════════════════════════════════ Signal Edit Form ═══════════════ -->
+<form method="POST" action="{{ url_for('signal_edit', signal_id=signal.id) }}">
+  <div class="row g-3 mb-4">
+
+    <!-- ── اطلاعات پایه ── -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-bottom fw-semibold small d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-pencil-square me-1 text-primary"></i>اطلاعات پایه</span>
+          <span class="badge bg-secondary-subtle text-secondary">#{{ signal.id }}</span>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-4">
+              <label class="form-label fw-medium small">نماد (Symbol) <span class="text-danger">*</span></label>
+              <input type="text" name="symbol" class="form-control form-control-sm"
+                     value="{{ signal.symbol }}" required>
+            </div>
+            <div class="col-sm-8">
+              <label class="form-label fw-medium small">تاریخ تحلیل</label>
+              <input type="datetime-local" name="analyzed_at" class="form-control form-control-sm"
+                     value="{{ signal.analyzed_at.strftime('%Y-%m-%dT%H:%M') if signal.analyzed_at else '' }}">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-medium small">منبع</label>
+
+              <!-- Type selector -->
+              <select name="source_type" id="sourceTypeSelect" class="form-select form-select-sm mb-2">
+                <option value="telegram" {% if src_type == 'telegram' %}selected{% endif %}>Telegram</option>
+                <option value="scraper"  {% if src_type == 'scraper'  %}selected{% endif %}>Scraper (وب‌اسکرپ)</option>
+                <option value="api"      {% if src_type == 'api'      %}selected{% endif %}>HTTP API</option>
+              </select>
+
+              <!-- Provider (always visible) -->
+              <div class="mb-2">
+                <label class="form-label small mb-1 text-muted">Provider / نام سرویس</label>
+                <input type="text" name="source_provider" class="form-control form-control-sm"
+                       value="{{ src.get('provider', '') }}" placeholder="مثلاً telegram / cointelegraph">
+              </div>
+
+              <!-- Telegram-specific fields -->
+              <div id="src-telegram" class="{% if src_type != 'telegram' %}d-none{% endif %}">
+                <div class="row g-2 mb-1">
+                  <div class="col-8">
+                    <label class="form-label small mb-1 text-muted">نام کانال</label>
+                    <input type="text" name="source_channel" class="form-control form-control-sm"
+                           value="{{ src.get('channel', '') }}" placeholder="@cointelegraph">
+                  </div>
+                  <div class="col-4">
+                    <label class="form-label small mb-1 text-muted">Message ID</label>
+                    <input type="number" name="source_message_id" class="form-control form-control-sm"
+                           value="{{ src.get('message_id', '') }}">
+                  </div>
+                </div>
+                {% set channel = src.get('channel', '') %}
+                {% set msg_id  = src.get('message_id') %}
+                {% if channel.startswith('@') and msg_id %}
+                <a href="https://t.me/{{ channel[1:] }}/{{ msg_id }}" target="_blank"
+                   class="small text-success d-inline-flex align-items-center gap-1 mt-1">
+                  <i class="bi bi-telegram"></i>باز کردن پیام در تلگرام
+                  <i class="bi bi-box-arrow-up-right" style="font-size:.65rem"></i>
+                </a>
+                {% endif %}
+              </div>
+
+              <!-- Scraper-specific fields -->
+              <div id="src-scraper" class="{% if src_type != 'scraper' %}d-none{% endif %}">
+                <label class="form-label small mb-1 text-muted">URL مقاله</label>
+                <input type="url" name="source_url" class="form-control form-control-sm mb-1"
+                       value="{{ src.get('url', '') }}" placeholder="https://...">
+                {% if src.get('url') %}
+                <a href="{{ src.get('url') }}" target="_blank"
+                   class="small text-primary d-inline-flex align-items-center gap-1">
+                  <i class="bi bi-globe"></i>باز کردن مقاله
+                  <i class="bi bi-box-arrow-up-right" style="font-size:.65rem"></i>
+                </a>
+                {% endif %}
+              </div>
+
+              <!-- API-specific fields -->
+              <div id="src-api" class="{% if src_type != 'api' %}d-none{% endif %}">
+                <label class="form-label small mb-1 text-muted">External ID</label>
+                <input type="text" name="source_external_id" class="form-control form-control-sm"
+                       value="{{ src.get('external_id', '') }}" placeholder="شناسه آیتم در سورس">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── قیمت بازار ── -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-bottom fw-semibold small">
+          <i class="bi bi-currency-dollar me-1 text-success"></i>قیمت بازار در زمان دریافت
+        </div>
+        <div class="card-body d-flex flex-column">
+          {% if signal.current_market_price %}
+          <div class="text-center mb-3">
+            <span class="fs-3 fw-bold text-success">{{ signal.current_market_price.get('price', '—') if signal.current_market_price is mapping else '—' }}</span>
+            <div class="text-muted small mt-1">قیمت فعلی ذخیره‌شده</div>
+          </div>
+          {% endif %}
+          <label class="form-label fw-medium small">ویرایش (JSON)</label>
+          <textarea name="current_market_price" class="form-control form-control-sm font-monospace flex-grow-1"
+                    rows="5" style="font-size:.78rem" placeholder='{"price": 50000, "source": "nobitex"}'>{{ signal.current_market_price | tojson(indent=2) if signal.current_market_price else '' }}</textarea>
+          <div class="form-text">خالی بگذارید تا پاک شود.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── خلاصه AI ── -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom fw-semibold small">
+          <i class="bi bi-robot me-1 text-info"></i>خلاصه AI
+        </div>
+        <div class="card-body">
+          <textarea name="ai_summary" class="form-control form-control-sm"
+                    rows="6" placeholder="خلاصه تحلیل AI...">{{ signal.ai_summary or '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── متن خام ── -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom fw-semibold small">
+          <i class="bi bi-file-text me-1"></i>متن خام (Raw Text)
+        </div>
+        <div class="card-body">
+          <textarea name="raw_text" class="form-control form-control-sm"
+                    rows="6" placeholder="متن اصلی پیام...">{{ signal.raw_text or '' }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save signal button -->
+  <div class="d-flex justify-content-end mb-4">
+    <button type="submit" class="btn btn-primary px-4">
+      <i class="bi bi-floppy me-1"></i>ذخیره تغییرات سیگنال
+    </button>
+  </div>
+</form>
+
+<!-- ═══════════════════════════════════════ Scenarios ═══════════════════════ -->
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h6 class="fw-bold mb-0"><i class="bi bi-diagram-2-fill me-1 text-primary"></i>سناریوهای معاملاتی</h6>
+  <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addScenarioModal">
+    <i class="bi bi-plus-lg me-1"></i>افزودن سناریو
+  </button>
+</div>
+
+{% if scenarios %}
+<div class="row g-3 mb-4">
+  {% for sc in scenarios %}
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm scenario-card
+      {% if sc.direction == 'long' %}border-success{% elif sc.direction == 'short' %}border-danger{% else %}border-secondary{% endif %}"
+      style="border-right:4px solid!important">
+      <div class="card-header bg-transparent border-bottom py-2 d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge
+            {% if sc.direction == 'long' %}bg-success{% elif sc.direction == 'short' %}bg-danger{% else %}bg-secondary{% endif %}">
+            {% if sc.direction == 'long' %}▲ Long{% elif sc.direction == 'short' %}▼ Short{% else %}→ Neutral{% endif %}
+          </span>
+          {% if sc.entry_type %}<span class="badge bg-light text-dark border small">{{ sc.entry_type }}</span>{% endif %}
+          <span class="badge bg-secondary-subtle text-secondary small">#{{ sc.id }}</span>
+        </div>
+        <div class="d-flex gap-1">
+          <button class="btn btn-sm btn-outline-primary py-0 px-2"
+                  data-bs-toggle="modal" data-bs-target="#editScenarioModal-{{ sc.id }}">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <form method="POST" action="{{ url_for('scenario_delete', signal_id=signal.id, scenario_id=sc.id) }}"
+                onsubmit="return confirm('سناریو #{{ sc.id }} حذف شود؟')">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+      <div class="card-body py-2">
+        <div class="row g-2 small">
+          {% if sc.entry_point is not none %}
+          <div class="col-6">
+            <span class="text-muted">نقطه ورود:</span>
+            <strong class="ms-1">{{ sc.entry_point }}</strong>
+          </div>
+          {% endif %}
+          {% if sc.stop_loss is not none %}
+          <div class="col-6">
+            <span class="text-muted">حد ضرر:</span>
+            <strong class="ms-1 text-danger">{{ sc.stop_loss }}</strong>
+          </div>
+          {% endif %}
+          {% if sc.take_profits %}
+          <div class="col-12">
+            <span class="text-muted">Take Profits:</span>
+            {% set tps = sc.take_profits %}
+            {% if tps is sequence and tps is not string %}
+              {% for tp in tps %}
+                <span class="badge bg-success-subtle text-success ms-1">{{ tp }}</span>
+              {% endfor %}
+            {% else %}
+              <span class="badge bg-success-subtle text-success ms-1">{{ tps }}</span>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if sc.confidence is not none %}
+          <div class="col-6">
+            <span class="text-muted">اطمینان:</span>
+            <strong class="ms-1">{{ (sc.confidence * 100)|round(0)|int }}%</strong>
+          </div>
+          {% endif %}
+          <div class="col-6">
+            <span class="text-muted">وضعیت:</span>
+            <span class="badge ms-1
+              {% if sc.status == 'running' %}bg-info-subtle text-info
+              {% elif sc.status == 'hit_tp' %}bg-success-subtle text-success
+              {% elif sc.status == 'hit_sl' %}bg-danger-subtle text-danger
+              {% else %}bg-secondary-subtle text-secondary{% endif %}">
+              {{ sc.status or '—' }}
+            </span>
+          </div>
+          {% if sc.result %}
+          <div class="col-12">
+            <span class="badge
+              {% if sc.result == 'win' %}bg-success
+              {% elif sc.result == 'loss' %}bg-danger
+              {% else %}bg-secondary{% endif %}">
+              نتیجه: {{ sc.result }}{% if sc.pnl_percent %} ({{ sc.pnl_percent }}%){% endif %}
+            </span>
+          </div>
+          {% endif %}
+        </div>
+        {% if sc.invalidation %}
+        <div class="mt-2 p-2 rounded-2 small" style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412">
+          <i class="bi bi-shield-x me-1"></i><strong>ابطال:</strong> {{ sc.invalidation }}
+        </div>
+        {% endif %}
+        {% if sc.reasoning %}
+        <p class="mt-2 mb-0 text-muted small fst-italic">{{ sc.reasoning[:120] }}{% if sc.reasoning|length > 120 %}…{% endif %}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Edit Scenario Modal ── -->
+  <div class="modal fade" id="editScenarioModal-{{ sc.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <form method="POST" action="{{ url_for('scenario_edit', signal_id=signal.id, scenario_id=sc.id) }}">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>ویرایش سناریو #{{ sc.id }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            {% include "_scenario_fields.html" with context %}
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-1"></i>ذخیره</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body text-center text-muted py-4">
+    <i class="bi bi-diagram-2 fs-3 d-block mb-2"></i>سناریویی ثبت نشده — از دکمه بالا اضافه کنید
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Add Scenario Modal ── -->
+<div class="modal fade" id="addScenarioModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('scenario_add', signal_id=signal.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle me-2 text-success"></i>افزودن سناریو جدید</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% set sc = none %}
+          {% include "_scenario_fields.html" %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="submit" class="btn btn-success"><i class="bi bi-plus-lg me-1"></i>افزودن</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.scenario-card { transition: box-shadow .2s; }
+.scenario-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1)!important; }
+</style>
+<script>
+(function () {
+  const sel = document.getElementById('sourceTypeSelect');
+  if (!sel) return;
+  const panels = { telegram: 'src-telegram', scraper: 'src-scraper', api: 'src-api' };
+  sel.addEventListener('change', function () {
+    Object.entries(panels).forEach(([type, id]) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('d-none', type !== sel.value);
+    });
+  });
+})();
+</script>
+{% endblock %}

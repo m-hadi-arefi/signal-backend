@@ -2,6 +2,7 @@ import asyncio
 
 from core.kafka_client import get_producer
 from core.trace import ensure_trace
+from core.text import clean_text
 from services.producers.http_api.fetcher import fetch
 from services.producers.http_api.parser import build_text, get_item_id, get_items
 from services.producers.http_api.tracker import ApiTracker
@@ -53,9 +54,10 @@ async def process_source(source: dict, producer, tracker: ApiTracker):
                     },
 
                     "payload": {
-                        "source":  name,
-                        "url":     source["url"],
-                        "payload": text,
+                        "source":    name,
+                        "url":       source["url"],
+                        "real_text": text,
+                        "text":      clean_text(text),
                     },
                 })
 

@@ -53,6 +53,10 @@ class SignalRepository:
 
         inserted = 0
         for symbol, symbol_signals in groups.items():
+            if not symbol_signals:
+                # No scenarios for this symbol — skip entirely (don't store Signal row)
+                continue
+
             market_price = price_by_symbol.get(symbol)
 
             signal = Signal(
@@ -88,6 +92,24 @@ def _group_by_symbol(raw_signals: List[dict]) -> Dict[str, List[dict]]:
     for raw in raw_signals:
         if not isinstance(raw, dict):
             continue
+
+        # Nested format: {symbol, senarios/scenarios: [...], expire_time?, ...}
+        # "senarios" is a known typo from the Claude gateway — handle both spellings.
+        nested = raw.get("senarios") or raw.get("scenarios")
+        if nested and isinstance(nested, list):
+            symbol = str(raw.get("symbol") or "").upper().strip()
+            if not symbol:
+                continue
+            for scenario in nested:
+                if isinstance(scenario, dict):
+                    s = dict(scenario)
+                    s["symbol"] = symbol
+                    if raw.get("expire_time") and "expire_time" not in s:
+                        s["expire_time"] = raw["expire_time"]
+                    groups.setdefault(symbol, []).append(s)
+            continue
+
+        # Flat format: one scenario dict with a symbol field
         symbol = _extract_symbol(raw)
         if not symbol:
             continue
@@ -109,22 +131,35 @@ def _extract_symbol(raw: dict) -> Optional[str]:
 # Scenario normalisation                                               #
 # ------------------------------------------------------------------ #
 
+# Map AI direction values to canonical DB values
+_DIRECTION_MAP = {
+    "up":   "long",
+    "down": "short",
+    "buy":  "long",
+    "sell": "short",
+}
+
+
 def _normalize_scenario(raw: dict) -> dict:
-    # Entry point
+    # Entry point — check nested entry.price, then flat entry_point / entry_price / price
     entry = raw.get("entry") or {}
     entry_point = _to_float(entry.get("price") if isinstance(entry, dict) else None)
     if entry_point is None:
-        entry_point = _to_float(raw.get("entry_price") or raw.get("price"))
+        entry_point = _to_float(
+            raw.get("entry_point") or raw.get("entry_price") or raw.get("price")
+        )
 
-    # Entry type (e.g. "limit", "market", "breakout")
+    # Entry type — nested entry.type, then entry_point_type / entry_type
     entry_type: Optional[str] = None
     if isinstance(entry, dict):
         entry_type = entry.get("type") or entry.get("entry_type")
+    if not entry_type:
+        entry_type = raw.get("entry_point_type") or raw.get("entry_type")
     if entry_type:
         entry_type = str(entry_type).lower()
 
-    # Take-profit levels — normalised to [{price, label?}, ...]
-    targets = raw.get("targets") or []
+    # Take-profit levels — support both "targets" and "tp" key names
+    targets = raw.get("targets") or raw.get("tp") or []
     take_profits: List[dict] = []
     for t in targets:
         if isinstance(t, dict):
@@ -139,18 +174,21 @@ def _normalize_scenario(raw: dict) -> dict:
             if p is not None:
                 take_profits.append({"price": p})
 
-    # Stop-loss
-    sl = raw.get("stop_loss") or {}
-    stop_loss = _to_float(sl.get("price") if isinstance(sl, dict) else sl)
+    # Stop-loss — support both "stop_loss" and "sl" key names
+    sl_raw = raw.get("stop_loss") or raw.get("sl")
+    stop_loss = _to_float(sl_raw.get("price") if isinstance(sl_raw, dict) else sl_raw)
 
-    # Direction — keep as-is (long / short / neutral / conditional)
-    direction = str(raw.get("direction") or raw.get("action") or "").lower().strip() or None
+    # Direction — map "up"/"down" to "long"/"short"
+    direction = str(raw.get("direction") or raw.get("action") or "").lower().strip()
+    direction = _DIRECTION_MAP.get(direction, direction) or None
 
-    # Conditions → reasoning prose
+    # Reasoning — check conditions list, then reasoning / rationale / reason fields
     conditions = raw.get("conditions") or []
     reasoning = "; ".join(str(c) for c in conditions if c) if conditions else None
     if not reasoning:
-        reasoning = raw.get("reasoning") or raw.get("rationale") or None
+        reasoning = (
+            raw.get("reasoning") or raw.get("rationale") or raw.get("reason") or None
+        )
 
     # Invalidation scenario description
     invalidation = raw.get("invalidation") or raw.get("invalidation_scenario") or None

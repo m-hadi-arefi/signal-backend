@@ -1,14 +1,15 @@
 services:
-  engine:
+  price-fetcher:
     build:
       context: .
       dockerfile: Dockerfile
-    command:  watchfiles 'python services/engine/main.py'
+    command:  watchfiles 'python services/processors/price_fetcher/main.py'
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/worker_ready"]
       interval: 5s
       timeout: 2s
       retries: 20
+    restart: unless-stopped
     depends_on:
       kafka:
         condition: service_healthy
@@ -20,50 +21,38 @@ services:
       - event-net
     volumes:
       - .:/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONPATH=/app
+  
+  signal-evaluator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:  watchfiles 'python services/processors/signal_evaluator/main.py'
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/worker_ready"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+    networks:
+      - event-net
+    volumes:
+      - .:/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONPATH=/app
 
-  ai-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command:  watchfiles 'python services/workers/ai_worker/main.py'
-    healthcheck:
-      test: ["CMD", "test", "-f", "/tmp/worker_ready"]
-      interval: 5s
-      timeout: 2s
-      retries: 20
-    depends_on:
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      postgres:
-        condition: service_started
-    networks:
-      - event-net
-    volumes:
-      - .:/app
-
-  final-store:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command:  watchfiles 'python services/workers/final_store/main.py'
-    healthcheck:
-      test: ["CMD", "test", "-f", "/tmp/worker_ready"]
-      interval: 5s
-      timeout: 2s
-      retries: 20
-    depends_on:
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      postgres:
-        condition: service_started
-    networks:
-      - event-net
-    volumes:
-      - .:/app
 networks:
   event-net:
     external: true

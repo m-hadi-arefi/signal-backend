@@ -20,6 +20,12 @@
       <i class="bi bi-globe me-1"></i>Scraper Sources
     </a>
   </li>
+  <li class="nav-item">
+    <a class="nav-link {% if active_tab == 'telegram' %}active{% endif %}"
+       href="{{ url_for('sources_telegram') }}">
+      <i class="bi bi-telegram me-1"></i>Telegram Channels
+    </a>
+  </li>
 </ul>
 
 {% if active_tab == 'http-api' %}
@@ -251,6 +257,135 @@
   </div>
 </div>
 {% endif %}
+
+{% if active_tab == 'telegram' %}
+<!-- ───────────── Telegram Channels ───────────── -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+    <span class="fw-semibold"><i class="bi bi-telegram me-1 text-info"></i>کانال‌های تلگرام</span>
+    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addTelegramModal">
+      <i class="bi bi-plus-lg me-1"></i>افزودن کانال
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>نام</th><th>هندل کانال</th><th>وضعیت</th><th>تاریخ ثبت</th><th>عملیات</th></tr>
+      </thead>
+      <tbody>
+        {% for s in telegram_sources %}
+        <tr>
+          <td class="text-muted small">{{ s.id }}</td>
+          <td class="fw-medium">{{ s.name }}</td>
+          <td><code>{{ s.channel }}</code></td>
+          <td>
+            {% if s.is_active %}
+              <span class="badge bg-success-subtle text-success"><i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>فعال</span>
+            {% else %}
+              <span class="badge bg-secondary-subtle text-secondary">غیرفعال</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ s.created_at.strftime('%Y-%m-%d') if s.created_at else '—' }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-outline-secondary btn-edit-telegram"
+                      data-bs-toggle="modal" data-bs-target="#editTelegramModal"
+                      data-id="{{ s.id }}" data-name="{{ s.name }}"
+                      data-channel="{{ s.channel }}"
+                      data-is_active="{{ s.is_active | lower }}">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <form method="POST" action="{{ url_for('sources_telegram_delete', sid=s.id) }}"
+                    onsubmit="return confirm('حذف شود؟')">
+                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">کانالی تعریف نشده</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mt-3 alert alert-info small">
+  <i class="bi bi-info-circle me-1"></i>
+  کانال‌های ثبت‌شده در اینجا، فقط در پایگاه داده ذخیره می‌شوند. برای فیلتر کردن پیام‌ها بر اساس این کانال‌ها، باید سرویس <code>telegram-producer</code> آپدیت شود تا این جدول را بخواند.
+</div>
+
+<!-- Add Telegram Modal -->
+<div class="modal fade" id="addTelegramModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('sources_telegram_add') }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-telegram me-2 text-info"></i>افزودن کانال تلگرام</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-medium">نام نمایشی <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" placeholder="مثلاً: سیگنال طلا" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">هندل کانال <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">@</span>
+              <input type="text" name="channel" class="form-control" placeholder="channel_username" required>
+            </div>
+            <div class="form-text">بدون @ وارد کنید. مثال: <code>goldtrading_ir</code></div>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" name="is_active" class="form-check-input" id="tg-add-active" checked>
+            <label class="form-check-label" for="tg-add-active">فعال</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="submit" class="btn btn-primary">ذخیره</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Telegram Modal -->
+<div class="modal fade" id="editTelegramModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" id="editTelegramForm">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>ویرایش کانال تلگرام</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-medium">نام نمایشی <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">هندل کانال <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">@</span>
+              <input type="text" name="channel" class="form-control" required>
+            </div>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" name="is_active" class="form-check-input" id="tg-edit-active">
+            <label class="form-check-label" for="tg-edit-active">فعال</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="submit" class="btn btn-primary">ذخیره</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -401,5 +536,19 @@ function clearTestResult(form) {
 function escHtml(str) {
   return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ── Populate Edit Telegram modal ───────────────────────────────────────────
+document.querySelectorAll('.btn-edit-telegram').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const form = document.getElementById('editTelegramForm');
+    form.action = '/sources/telegram/' + btn.dataset.id + '/edit';
+    const nameEl    = form.querySelector('[name="name"]');
+    const channelEl = form.querySelector('[name="channel"]');
+    const activeCb  = form.querySelector('[name="is_active"]');
+    if (nameEl)    nameEl.value    = btn.dataset.name    || '';
+    if (channelEl) channelEl.value = btn.dataset.channel || '';
+    if (activeCb)  activeCb.checked = btn.dataset.is_active === 'true';
+  });
+});
 </script>
 {% endblock %}

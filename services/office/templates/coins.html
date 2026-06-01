@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}مدیریت ارزها{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold"><i class="bi bi-currency-bitcoin me-2 text-warning"></i>ارزهای تحت پایش</h4>
+    <small class="text-muted">فقط سیگنال‌هایی که نمادشان در لیست فعال باشد پردازش می‌شوند</small>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <span class="badge bg-success fs-6">{{ active_count }} فعال</span>
+    <span class="badge bg-secondary">{{ total }} کل</span>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<form method="GET" class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-center">
+      <div class="col-md-5">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" name="search" class="form-control"
+                 placeholder="جستجو: نماد، نام انگلیسی یا فارسی"
+                 value="{{ search }}">
+        </div>
+      </div>
+      <div class="col-md-3">
+        <select name="active" class="form-select form-select-sm">
+          <option value=""  {% if active_filter == ''  %}selected{% endif %}>همه ارزها</option>
+          <option value="1" {% if active_filter == '1' %}selected{% endif %}>فقط فعال‌ها</option>
+          <option value="0" {% if active_filter == '0' %}selected{% endif %}>فقط غیرفعال‌ها</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">اعمال فیلتر</button>
+        <a href="{{ url_for('coins_page') }}" class="btn btn-outline-secondary btn-sm">پاک</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Bulk actions -->
+<form method="POST" action="{{ url_for('coins_bulk') }}" id="bulk-form">
+  <div class="card border-0 shadow-sm mb-2">
+    <div class="card-body py-2 d-flex gap-2 align-items-center">
+      <span class="text-muted small">عملیات گروهی:</span>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAll(true)">انتخاب همه</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAll(false)">لغو انتخاب</button>
+      <div class="ms-auto d-flex gap-2">
+        <button type="submit" name="action" value="enable"
+                class="btn btn-sm btn-success" onclick="return checkSelected()">
+          <i class="bi bi-check-circle me-1"></i>فعال کردن انتخاب‌شده‌ها
+        </button>
+        <button type="submit" name="action" value="disable"
+                class="btn btn-sm btn-outline-danger" onclick="return checkSelected()">
+          <i class="bi bi-dash-circle me-1"></i>غیرفعال کردن انتخاب‌شده‌ها
+        </button>
+        <div class="border-start mx-1"></div>
+        <button type="submit" name="action" value="enable_all"
+                class="btn btn-sm btn-warning"
+                onclick="return confirm('همه {{ total }} ارز فعال شوند؟')">
+          فعال همه
+        </button>
+        <button type="submit" name="action" value="disable_all"
+                class="btn btn-sm btn-dark"
+                onclick="return confirm('همه ارزها غیرفعال شوند؟')">
+          غیرفعال همه
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Coins table -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0" id="coins-table">
+        <thead class="table-light">
+          <tr>
+            <th style="width:36px">
+              <input type="checkbox" class="form-check-input" id="chk-all"
+                     onchange="document.querySelectorAll('.coin-chk').forEach(c=>c.checked=this.checked)">
+            </th>
+            <th>نماد</th>
+            <th>نام</th>
+            <th>نام فارسی</th>
+            <th class="text-center">وضعیت</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for coin in rows %}
+          <tr id="row-{{ coin.symbol }}" class="{% if not coin.is_active %}table-light text-muted{% endif %}">
+            <td>
+              <input type="checkbox" class="form-check-input coin-chk"
+                     name="symbols" value="{{ coin.symbol }}">
+            </td>
+            <td>
+              <span class="badge font-monospace
+                {% if coin.is_active %}bg-warning text-dark{% else %}bg-light text-secondary border{% endif %}"
+                style="font-size:.85rem;letter-spacing:.03em">
+                {{ coin.symbol | upper }}
+              </span>
+            </td>
+            <td class="fw-medium small">{{ coin.name or '—' }}</td>
+            <td class="small" dir="rtl">{{ coin.fa_name or '—' }}</td>
+            <td class="text-center">
+              <div class="form-check form-switch d-flex justify-content-center mb-0">
+                <input class="form-check-input coin-toggle" type="checkbox" role="switch"
+                       style="cursor:pointer;width:2.5em;height:1.3em"
+                       data-symbol="{{ coin.symbol }}"
+                       {% if coin.is_active %}checked{% endif %}>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-5">
+              <i class="bi bi-search fs-3 d-block mb-2"></i>ارزی یافت نشد
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</form>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center mb-0">
+    {% if page > 1 %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page-1 }}&search={{ search }}&active={{ active_filter }}">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </li>
+    {% endif %}
+    {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+    <li class="page-item {% if p == page %}active{% endif %}">
+      <a class="page-link" href="?page={{ p }}&search={{ search }}&active={{ active_filter }}">{{ p }}</a>
+    </li>
+    {% endfor %}
+    {% if page < total_pages %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page+1 }}&search={{ search }}&active={{ active_filter }}">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+<div class="mt-3 alert alert-info small">
+  <i class="bi bi-info-circle me-1"></i>
+  تغییر وضعیت هر ارز <strong>بلافاصله</strong> در دیتابیس ذخیره می‌شود. AI Worker هر ۵ دقیقه یک‌بار لیست فعال را از دیتابیس می‌خواند.
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Toggle individual coin via AJAX ────────────────────────────────────────
+document.querySelectorAll('.coin-toggle').forEach(chk => {
+  chk.addEventListener('change', async function () {
+    const symbol   = this.dataset.symbol;
+    const isActive = this.checked ? '1' : '0';
+    const row      = document.getElementById('row-' + symbol);
+
+    this.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append('is_active', isActive);
+      const resp = await fetch('/coins/' + symbol + '/toggle', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (data.ok) {
+        // Update row style
+        if (data.is_active) {
+          row.classList.remove('table-light', 'text-muted');
+          row.querySelector('.badge').className = 'badge font-monospace bg-warning text-dark';
+        } else {
+          row.classList.add('table-light', 'text-muted');
+          row.querySelector('.badge').className = 'badge font-monospace bg-light text-secondary border';
+        }
+        // Update active count badge
+        const cnt = document.querySelector('.badge.bg-success');
+        if (cnt) {
+          let n = parseInt(cnt.textContent);
+          cnt.textContent = (data.is_active ? n + 1 : n - 1) + ' فعال';
+        }
+      } else {
+        this.checked = !this.checked; // revert
+        alert('خطا: ' + (data.error || 'ناشناخته'));
+      }
+    } catch (e) {
+      this.checked = !this.checked;
+      alert('خطای شبکه: ' + e.message);
+    } finally {
+      this.disabled = false;
+    }
+  });
+});
+
+// ── Bulk select helpers ────────────────────────────────────────────────────
+function selectAll(val) {
+  document.querySelectorAll('.coin-chk').forEach(c => c.checked = val);
+  document.getElementById('chk-all').checked = val;
+}
+
+function checkSelected() {
+  const selected = document.querySelectorAll('.coin-chk:checked').length;
+  if (!selected) { alert('ابتدا ارزهایی را انتخاب کنید'); return false; }
+  return true;
+}
+
+</script>
+{% endblock %}

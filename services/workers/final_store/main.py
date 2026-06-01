@@ -58,6 +58,17 @@ class FinalStoreWorker(BaseWorker):
             log("final_store", "info", trace_id, "no_signals_to_store")
             return None
 
+        # Drop events where every symbol has an empty scenario list
+        has_any_scenario = any(
+            bool(s.get("senarios") or s.get("scenarios"))
+            if isinstance(s, dict) and ("senarios" in s or "scenarios" in s)
+            else True  # flat format — let repository decide
+            for s in raw_signals
+        )
+        if not has_any_scenario:
+            log("final_store", "info", trace_id, "no_scenarios_in_any_signal_dropped")
+            return None
+
         # 2. Unique symbols — fetch Redis price for each
         symbols = _unique_symbols(raw_signals)
         price_by_symbol = await asyncio.to_thread(self._fetch_prices, symbols, trace_id)

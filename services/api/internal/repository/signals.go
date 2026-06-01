@@ -4,63 +4,77 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ------------------------------------------------------------------ //
-// Domain types                                                         //
-// ------------------------------------------------------------------ //
+// ─── Domain types ──────────────────────────────────────────────────────────────
 
+// Signal is one AI-analysed trading signal. raw_text is intentionally excluded.
 type Signal struct {
-	ID                 int64           `json:"id"                            example:"1"`
-	Symbol             string          `json:"symbol"                        example:"BTCUSDT"`
-	TraceID            string          `json:"trace_id"                      example:"3f2d1a9b-feed-4c2e-bae4-abc123def456"`
-	Source             json.RawMessage `json:"source"                        swaggertype:"object"`
-	RawText            *string         `json:"raw_text,omitempty"            example:"BTC breaks key resistance — targeting 52k"`
-	AISummary          *string         `json:"ai_summary,omitempty"          example:"Strong bullish breakout confirmed with high volume"`
-	CurrentMarketPrice json.RawMessage `json:"current_market_price,omitempty" swaggertype:"object"`
-	CreatedAt          time.Time       `json:"created_at"                    example:"2024-01-15T09:00:00Z"`
-	AnalyzedAt         *time.Time      `json:"analyzed_at,omitempty"         example:"2024-01-15T09:05:00Z"`
-	Scenarios          []Scenario      `json:"scenarios,omitempty"`
+	ID                 int64           `json:"id"`
+	Symbol             string          `json:"symbol"`
+	TraceID            string          `json:"trace_id"`
+	Source             json.RawMessage `json:"source"`
+	AISummary          *string         `json:"ai_summary,omitempty"`
+	CurrentMarketPrice json.RawMessage `json:"current_market_price,omitempty"`
+	CreatedAt          time.Time       `json:"created_at"`
+	AnalyzedAt         *time.Time      `json:"analyzed_at,omitempty"`
+	Scenarios          []Scenario      `json:"scenarios"`
 }
 
+// Scenario is one tradeable setup extracted from a Signal.
 type Scenario struct {
-	ID           int64            `json:"id"                  example:"1"`
-	SignalID     int64            `json:"signal_id"           example:"1"`
-	Direction    *string          `json:"direction,omitempty" example:"long"    enums:"long,short"`
-	EntryPoint   *float64         `json:"entry_point,omitempty" example:"49500.0"`
-	EntryType    *string          `json:"entry_type,omitempty"  example:"limit" enums:"market,limit"`
-	TakeProfits  json.RawMessage  `json:"take_profits,omitempty" swaggertype:"object"`
-	StopLoss     *float64         `json:"stop_loss,omitempty"   example:"47000.0"`
-	Invalidation *string          `json:"invalidation,omitempty" example:"Daily close below 47000 invalidates setup"`
-	Confidence   *float64         `json:"confidence,omitempty"  example:"0.85" minimum:"0" maximum:"1"`
-	Reasoning    *string          `json:"reasoning,omitempty"   example:"Strong support level with increasing volume and RSI divergence"`
-	Status       string           `json:"status"                example:"active" enums:"active,closed,invalidated"`
-	Results      []ScenarioResult `json:"results,omitempty"`
+	ID          int64           `json:"id"`
+	SignalID    int64           `json:"-"` // internal only
+	Direction   *string         `json:"direction,omitempty"`
+	EntryPoint  *float64        `json:"entry_point,omitempty"`
+	EntryType   *string         `json:"entry_type,omitempty"`
+	TakeProfits json.RawMessage `json:"take_profits,omitempty"`
+	StopLoss    *float64        `json:"stop_loss,omitempty"`
+	Confidence  *float64        `json:"confidence,omitempty"`
+	Reasoning   *string         `json:"reasoning,omitempty"`
+	Status      string          `json:"status"`     // running / active / success / failed / expired
+	IsEntered   bool            `json:"is_entered"` // true when entry condition is confirmed
+	ExpiresAt   *time.Time      `json:"expires_at,omitempty"`
+	Result      *ScenarioResult `json:"result,omitempty"` // nil until first evaluator cycle
 }
 
+// ScenarioResult is the live/final evaluation snapshot.
 type ScenarioResult struct {
-	ID          int64      `json:"id"                    example:"1"`
-	ScenarioID  int64      `json:"scenario_id"           example:"1"`
-	Result      string     `json:"result"                example:"win" enums:"win,loss,partial,pending"`
-	PnlPercent  *float64   `json:"pnl_percent,omitempty" example:"8.5"`
-	HitTP       *float64   `json:"hit_tp,omitempty"      example:"51000.0"`
+	Result      string     `json:"result"` // running / success / failed / expired
+	PnlPercent  *float64   `json:"pnl_percent,omitempty"`
+	HitTP       *float64   `json:"hit_tp,omitempty"`
 	HitSL       *float64   `json:"hit_sl,omitempty"`
-	MaxDrawdown *float64   `json:"max_drawdown,omitempty" example:"-2.3"`
-	EvaluatedAt *time.Time `json:"evaluated_at,omitempty" example:"2024-01-16T14:30:00Z"`
+	MaxDrawdown *float64   `json:"max_drawdown,omitempty"`
+	EnteredAt   *time.Time `json:"entered_at,omitempty"`
+	EvaluatedAt *time.Time `json:"evaluated_at,omitempty"`
 }
 
-// ------------------------------------------------------------------ //
-// Pagination                                                           //
-// ------------------------------------------------------------------ //
+// ActiveCoin is a coin that the admin has enabled for tracking.
+type ActiveCoin struct {
+	Symbol string `json:"symbol"`
+	Name   string `json:"name"`
+	FaName string `json:"fa_name"`
+}
+
+// SourceInfo aggregates stats for one signal source provider.
+type SourceInfo struct {
+	Provider     string    `json:"provider"`
+	Type         string    `json:"type"`
+	SignalCount  int64     `json:"signal_count"`
+	LastSignalAt time.Time `json:"last_signal_at"`
+}
+
+// ─── Pagination wrappers ──────────────────────────────────────────────────────
 
 type PageMeta struct {
-	Page  int   `json:"page"  example:"1"`
-	Limit int   `json:"limit" example:"20"`
-	Total int64 `json:"total" example:"150"`
+	Page  int   `json:"page"`
+	Limit int   `json:"limit"`
+	Total int64 `json:"total"`
 }
 
 type SignalsPage struct {
@@ -68,21 +82,24 @@ type SignalsPage struct {
 	Meta PageMeta `json:"meta"`
 }
 
-// ------------------------------------------------------------------ //
-// Query parameters                                                     //
-// ------------------------------------------------------------------ //
+type CoinsPage struct {
+	Data []ActiveCoin `json:"data"`
+}
+
+type SourcesPage struct {
+	Data []SourceInfo `json:"data"`
+}
+
+// ─── Query params ─────────────────────────────────────────────────────────────
 
 type SignalListParams struct {
 	Page        int
 	Limit       int
-	Symbol      string // filter by symbol (exact, uppercase)
-	SrcType     string // filter by source.type
-	SrcProvider string // filter by source.provider
+	Symbol      string // uppercase
+	SrcProvider string
 }
 
-// ------------------------------------------------------------------ //
-// Repository                                                           //
-// ------------------------------------------------------------------ //
+// ─── Repository ───────────────────────────────────────────────────────────────
 
 type SignalRepository struct {
 	pool *pgxpool.Pool
@@ -92,9 +109,119 @@ func NewSignalRepository(pool *pgxpool.Pool) *SignalRepository {
 	return &SignalRepository{pool: pool}
 }
 
-// List returns paginated signals without scenarios.
+// List returns paginated signals with scenarios and latest results.
 func (r *SignalRepository) List(ctx context.Context, p SignalListParams) (*SignalsPage, error) {
-	query, args := buildSignalQuery(p, false)
+	return r.querySignals(ctx, "", nil, p)
+}
+
+// GetByID returns a single signal with full data, or nil if not found.
+func (r *SignalRepository) GetByID(ctx context.Context, id int64) (*Signal, error) {
+	p := SignalListParams{Page: 1, Limit: 1}
+	page, err := r.querySignals(ctx, "s.id = $1", []any{id}, p)
+	if err != nil {
+		return nil, err
+	}
+	if len(page.Data) == 0 {
+		return nil, nil
+	}
+	return &page.Data[0], nil
+}
+
+// ListByCoin returns paginated signals for the given coin symbol.
+func (r *SignalRepository) ListByCoin(ctx context.Context, symbol string, p SignalListParams) (*SignalsPage, error) {
+	return r.querySignals(ctx, "s.symbol = $1", []any{strings.ToUpper(symbol)}, p)
+}
+
+// ListByProvider returns paginated signals from the given source provider.
+func (r *SignalRepository) ListByProvider(ctx context.Context, provider string, p SignalListParams) (*SignalsPage, error) {
+	filter, _ := json.Marshal(map[string]string{"provider": provider})
+	return r.querySignals(ctx, "s.source @> $1::jsonb", []any{filter}, p)
+}
+
+// ListActiveCoins returns all active tracked coins.
+func (r *SignalRepository) ListActiveCoins(ctx context.Context) (*CoinsPage, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT symbol, name, fa_name
+		FROM   tracked_coins
+		WHERE  is_active = TRUE
+		ORDER  BY symbol
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	coins := make([]ActiveCoin, 0)
+	for rows.Next() {
+		var c ActiveCoin
+		if err := rows.Scan(&c.Symbol, &c.Name, &c.FaName); err != nil {
+			return nil, err
+		}
+		coins = append(coins, c)
+	}
+	return &CoinsPage{Data: coins}, rows.Err()
+}
+
+// ListSources returns distinct source providers with signal stats.
+func (r *SignalRepository) ListSources(ctx context.Context) (*SourcesPage, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT
+			COALESCE(source->>'provider', '') AS provider,
+			COALESCE(source->>'type', '')     AS type,
+			COUNT(*)                          AS signal_count,
+			MAX(created_at)                   AS last_signal_at
+		FROM   signals
+		WHERE  source->>'provider' IS NOT NULL
+		GROUP  BY source->>'provider', source->>'type'
+		ORDER  BY last_signal_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sources := make([]SourceInfo, 0)
+	for rows.Next() {
+		var s SourceInfo
+		if err := rows.Scan(&s.Provider, &s.Type, &s.SignalCount, &s.LastSignalAt); err != nil {
+			return nil, err
+		}
+		sources = append(sources, s)
+	}
+	return &SourcesPage{Data: sources}, rows.Err()
+}
+
+// ─── Internal ─────────────────────────────────────────────────────────────────
+
+// querySignals is the common path for all signal list queries.
+// cond is an optional WHERE clause fragment (e.g. "s.symbol = $1").
+// condArgs holds the values for the condition placeholders.
+func (r *SignalRepository) querySignals(
+	ctx context.Context,
+	cond string,
+	condArgs []any,
+	p SignalListParams,
+) (*SignalsPage, error) {
+	where := ""
+	if cond != "" {
+		where = "WHERE " + cond
+	}
+
+	// LIMIT / OFFSET are always the last two positional args
+	n := len(condArgs) + 1
+	args := append(condArgs, p.Limit, (p.Page-1)*p.Limit)
+
+	query := fmt.Sprintf(`
+		SELECT
+			s.id, s.symbol, s.trace_id, s.source,
+			s.ai_summary, s.current_market_price,
+			s.created_at, s.analyzed_at,
+			COUNT(*) OVER() AS total
+		FROM   signals s
+		%s
+		ORDER  BY s.created_at DESC
+		LIMIT  $%d OFFSET $%d
+	`, where, n, n+1)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -110,7 +237,7 @@ func (r *SignalRepository) List(ctx context.Context, p SignalListParams) (*Signa
 		var srcRaw, priceRaw []byte
 		if err := rows.Scan(
 			&s.ID, &s.Symbol, &s.TraceID, &srcRaw,
-			&s.RawText, &s.AISummary, &priceRaw,
+			&s.AISummary, &priceRaw,
 			&s.CreatedAt, &s.AnalyzedAt, &total,
 		); err != nil {
 			return nil, err
@@ -119,10 +246,17 @@ func (r *SignalRepository) List(ctx context.Context, p SignalListParams) (*Signa
 		if len(priceRaw) > 0 {
 			s.CurrentMarketPrice = json.RawMessage(priceRaw)
 		}
+		s.Scenarios = []Scenario{}
 		signals = append(signals, s)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+
+	if len(signals) > 0 {
+		if err := r.attachScenarios(ctx, signals); err != nil {
+			return nil, err
+		}
 	}
 
 	return &SignalsPage{
@@ -131,172 +265,129 @@ func (r *SignalRepository) List(ctx context.Context, p SignalListParams) (*Signa
 	}, nil
 }
 
-// ListWithResults returns paginated signals with scenarios and scenario_results.
-// Uses 3 queries total — no N+1.
-func (r *SignalRepository) ListWithResults(ctx context.Context, p SignalListParams) (*SignalsPage, error) {
-	// Query 1: signals (same as List)
-	page, err := r.List(ctx, p)
-	if err != nil {
-		return nil, err
-	}
-	if len(page.Data) == 0 {
-		return page, nil
-	}
-
-	signalIDs := make([]int64, len(page.Data))
-	for i, s := range page.Data {
+// attachScenarios loads scenarios + results for the given signals in-place (2 queries).
+func (r *SignalRepository) attachScenarios(ctx context.Context, signals []Signal) error {
+	signalIDs := make([]int64, len(signals))
+	createdAtMap := make(map[int64]time.Time, len(signals))
+	for i, s := range signals {
 		signalIDs[i] = s.ID
+		createdAtMap[s.ID] = s.CreatedAt
 	}
 
-	// Query 2: all scenarios for these signals
-	scenarios, err := r.fetchScenarios(ctx, signalIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Query 3: all results for those scenarios (if any)
-	if len(scenarios) > 0 {
-		scenarioIDs := make([]int64, len(scenarios))
-		for i, sc := range scenarios {
-			scenarioIDs[i] = sc.ID
-		}
-		results, err := r.fetchScenarioResults(ctx, scenarioIDs)
-		if err != nil {
-			return nil, err
-		}
-		// Attach results to their scenarios
-		resultsByScenario := make(map[int64][]ScenarioResult, len(results))
-		for _, res := range results {
-			resultsByScenario[res.ScenarioID] = append(resultsByScenario[res.ScenarioID], res)
-		}
-		for i := range scenarios {
-			scenarios[i].Results = resultsByScenario[scenarios[i].ID]
-		}
-	}
-
-	// Attach scenarios to their signals
-	scenariosBySignal := make(map[int64][]Scenario, len(page.Data))
-	for _, sc := range scenarios {
-		scenariosBySignal[sc.SignalID] = append(scenariosBySignal[sc.SignalID], sc)
-	}
-	for i := range page.Data {
-		page.Data[i].Scenarios = scenariosBySignal[page.Data[i].ID]
-	}
-
-	return page, nil
-}
-
-// ------------------------------------------------------------------ //
-// Internal fetch helpers (scenario, scenario_result)                   //
-// ------------------------------------------------------------------ //
-
-func (r *SignalRepository) fetchScenarios(ctx context.Context, signalIDs []int64) ([]Scenario, error) {
-	rows, err := r.pool.Query(ctx, `
+	// ── Scenarios ──
+	scRows, err := r.pool.Query(ctx, `
 		SELECT id, signal_id, direction, entry_point, entry_type,
-		       take_profits, stop_loss, invalidation, confidence, reasoning, status
-		FROM scenarios
-		WHERE signal_id = ANY($1)
-		ORDER BY signal_id, id
+		       take_profits, stop_loss, confidence, reasoning, status,
+		       COALESCE(raw->>'expire_time', '') AS expire_time
+		FROM   scenarios
+		WHERE  signal_id = ANY($1)
+		ORDER  BY signal_id, id
 	`, signalIDs)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer rows.Close()
+	defer scRows.Close()
 
-	var out []Scenario
-	for rows.Next() {
+	scenarios := make([]Scenario, 0)
+	scenarioIDs := make([]int64, 0)
+
+	for scRows.Next() {
 		var sc Scenario
 		var tpRaw []byte
-		if err := rows.Scan(
+		var expireStr string
+		if err := scRows.Scan(
 			&sc.ID, &sc.SignalID, &sc.Direction, &sc.EntryPoint, &sc.EntryType,
-			&tpRaw, &sc.StopLoss, &sc.Invalidation, &sc.Confidence, &sc.Reasoning, &sc.Status,
+			&tpRaw, &sc.StopLoss, &sc.Confidence, &sc.Reasoning, &sc.Status,
+			&expireStr,
 		); err != nil {
-			return nil, err
+			return err
 		}
 		if len(tpRaw) > 0 {
 			sc.TakeProfits = json.RawMessage(tpRaw)
 		}
-		out = append(out, sc)
-	}
-	return out, rows.Err()
-}
-
-func (r *SignalRepository) fetchScenarioResults(ctx context.Context, scenarioIDs []int64) ([]ScenarioResult, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, scenario_id, result, pnl_percent, hit_tp, hit_sl, max_drawdown, evaluated_at
-		FROM scenario_results
-		WHERE scenario_id = ANY($1)
-		ORDER BY scenario_id, id
-	`, scenarioIDs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []ScenarioResult
-	for rows.Next() {
-		var res ScenarioResult
-		if err := rows.Scan(
-			&res.ID, &res.ScenarioID, &res.Result,
-			&res.PnlPercent, &res.HitTP, &res.HitSL,
-			&res.MaxDrawdown, &res.EvaluatedAt,
-		); err != nil {
-			return nil, err
+		sc.IsEntered = sc.Status == "active"
+		if expireStr != "" {
+			sc.ExpiresAt = parseExpireTime(createdAtMap[sc.SignalID], expireStr)
 		}
-		out = append(out, res)
+		scenarioIDs = append(scenarioIDs, sc.ID)
+		scenarios = append(scenarios, sc)
 	}
-	return out, rows.Err()
+	if err := scRows.Err(); err != nil {
+		return err
+	}
+
+	// ── Scenario results (one per scenario due to unique constraint) ──
+	resultMap := make(map[int64]*ScenarioResult, len(scenarioIDs))
+	if len(scenarioIDs) > 0 {
+		rRows, err := r.pool.Query(ctx, `
+			SELECT scenario_id, result, pnl_percent, hit_tp, hit_sl,
+			       max_drawdown, entered_at, evaluated_at
+			FROM   scenario_results
+			WHERE  scenario_id = ANY($1)
+		`, scenarioIDs)
+		if err != nil {
+			return err
+		}
+		defer rRows.Close()
+
+		for rRows.Next() {
+			var scID int64
+			var res ScenarioResult
+			if err := rRows.Scan(
+				&scID, &res.Result, &res.PnlPercent,
+				&res.HitTP, &res.HitSL, &res.MaxDrawdown,
+				&res.EnteredAt, &res.EvaluatedAt,
+			); err != nil {
+				return err
+			}
+			r2 := res
+			resultMap[scID] = &r2
+		}
+		if err := rRows.Err(); err != nil {
+			return err
+		}
+	}
+
+	// Attach results → scenarios → signals
+	bySignal := make(map[int64][]Scenario, len(signals))
+	for i := range scenarios {
+		if res, ok := resultMap[scenarios[i].ID]; ok {
+			scenarios[i].Result = res
+		}
+		bySignal[scenarios[i].SignalID] = append(bySignal[scenarios[i].SignalID], scenarios[i])
+	}
+	for i := range signals {
+		if sc, ok := bySignal[signals[i].ID]; ok {
+			signals[i].Scenarios = sc
+		}
+	}
+	return nil
 }
 
-// ------------------------------------------------------------------ //
-// Query builder                                                        //
-// ------------------------------------------------------------------ //
+// ─── Duration helper ──────────────────────────────────────────────────────────
 
-func buildSignalQuery(p SignalListParams, _ bool) (string, []any) {
-	var (
-		conditions []string
-		args       []any
-		n          = 1
-	)
-
-	if p.Symbol != "" {
-		conditions = append(conditions, fmt.Sprintf("symbol = $%d", n))
-		args = append(args, strings.ToUpper(p.Symbol))
-		n++
+func parseExpireTime(createdAt time.Time, expireStr string) *time.Time {
+	s := strings.ToLower(strings.TrimSpace(expireStr))
+	if len(s) < 2 {
+		return nil
 	}
-	if p.SrcType != "" {
-		filter, _ := json.Marshal(map[string]string{"type": p.SrcType})
-		conditions = append(conditions, fmt.Sprintf("source @> $%d::jsonb", n))
-		args = append(args, filter)
-		n++
+	n, err := strconv.Atoi(s[:len(s)-1])
+	if err != nil || n <= 0 {
+		return nil
 	}
-	if p.SrcProvider != "" {
-		filter, _ := json.Marshal(map[string]string{"provider": p.SrcProvider})
-		conditions = append(conditions, fmt.Sprintf("source @> $%d::jsonb", n))
-		args = append(args, filter)
-		n++
+	var d time.Duration
+	switch s[len(s)-1] {
+	case 'd':
+		d = time.Duration(n) * 24 * time.Hour
+	case 'w':
+		d = time.Duration(n) * 7 * 24 * time.Hour
+	case 'm':
+		d = time.Duration(n) * 30 * 24 * time.Hour
+	case 'y':
+		d = time.Duration(n) * 365 * 24 * time.Hour
+	default:
+		return nil
 	}
-
-	where := ""
-	if len(conditions) > 0 {
-		where = "WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	// LIMIT and OFFSET are always last two positional args
-	args = append(args, p.Limit, (p.Page-1)*p.Limit)
-	limitN, offsetN := n, n+1
-
-	query := fmt.Sprintf(`
-		SELECT
-			id, symbol, trace_id, source,
-			raw_text, ai_summary, current_market_price,
-			created_at, analyzed_at,
-			COUNT(*) OVER() AS total
-		FROM signals
-		%s
-		ORDER BY created_at DESC
-		LIMIT $%d OFFSET $%d
-	`, where, limitN, offsetN)
-
-	return query, args
+	t := createdAt.Add(d)
+	return &t
 }

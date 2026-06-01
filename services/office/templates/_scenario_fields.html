@@ -1,0 +1,71 @@
+<div class="row g-3">
+  <div class="col-sm-4">
+    <label class="form-label fw-medium small">جهت (Direction)</label>
+    <select name="direction" class="form-select form-select-sm">
+      <option value="">انتخاب کنید</option>
+      <option value="long"    {% if sc and sc.direction == 'long'    %}selected{% endif %}>▲ Long</option>
+      <option value="short"   {% if sc and sc.direction == 'short'   %}selected{% endif %}>▼ Short</option>
+      <option value="neutral" {% if sc and sc.direction == 'neutral' %}selected{% endif %}>→ Neutral</option>
+    </select>
+  </div>
+  <div class="col-sm-4">
+    <label class="form-label fw-medium small">نوع ورود (Entry Type)</label>
+    <select name="entry_type" class="form-select form-select-sm">
+      <option value="">انتخاب کنید</option>
+      <option value="fix"          {% if sc and sc.entry_type == 'fix'          %}selected{% endif %}>Fix</option>
+      <option value="break_up"     {% if sc and sc.entry_type == 'break_up'     %}selected{% endif %}>Break Up</option>
+      <option value="break_down"   {% if sc and sc.entry_type == 'break_down'   %}selected{% endif %}>Break Down</option>
+      <option value="consolidation"{% if sc and sc.entry_type == 'consolidation'%}selected{% endif %}>Consolidation</option>
+    </select>
+  </div>
+  <div class="col-sm-4">
+    <label class="form-label fw-medium small">وضعیت</label>
+    <select name="status" class="form-select form-select-sm">
+      <option value="running"  {% if not sc or sc.status == 'running'  %}selected{% endif %}>running</option>
+      <option value="hit_tp"   {% if sc and sc.status == 'hit_tp'   %}selected{% endif %}>hit_tp</option>
+      <option value="hit_sl"   {% if sc and sc.status == 'hit_sl'   %}selected{% endif %}>hit_sl</option>
+      <option value="expired"  {% if sc and sc.status == 'expired'  %}selected{% endif %}>expired</option>
+      <option value="canceled" {% if sc and sc.status == 'canceled' %}selected{% endif %}>canceled</option>
+    </select>
+  </div>
+
+  <div class="col-sm-4">
+    <label class="form-label fw-medium small">نقطه ورود (Entry Point)</label>
+    <input type="number" step="any" name="entry_point" class="form-control form-control-sm"
+           placeholder="مثلاً 65000" value="{{ sc.entry_point if sc and sc.entry_point is not none else '' }}">
+  </div>
+  <div class="col-sm-4">
+    <label class="form-label fw-medium small">حد ضرر (Stop Loss)</label>
+    <input type="number" step="any" name="stop_loss" class="form-control form-control-sm"
+           placeholder="مثلاً 60000" value="{{ sc.stop_loss if sc and sc.stop_loss is not none else '' }}">
+  </div>
+  <div class="col-sm-4">
+    <label class="form-label fw-medium small">اطمینان (0 تا 1)</label>
+    <input type="number" step="0.01" min="0" max="1" name="confidence" class="form-control form-control-sm"
+           placeholder="مثلاً 0.85" value="{{ sc.confidence if sc and sc.confidence is not none else '' }}">
+  </div>
+
+  <div class="col-12">
+    <label class="form-label fw-medium small">
+      Take Profits
+      <span class="text-muted fw-normal">(JSON Array)</span>
+    </label>
+    <input type="text" name="take_profits" class="form-control form-control-sm font-monospace"
+           placeholder='[68000, 72000, 78000]'
+           value="{{ sc.take_profits | tojson if sc and sc.take_profits else '' }}">
+    <div class="form-text">آرایه‌ای از اعداد. مثال: <code>[68000, 72000, 78000]</code></div>
+  </div>
+
+  <div class="col-12">
+    <label class="form-label fw-medium small">شرط ابطال (Invalidation)</label>
+    <input type="text" name="invalidation" class="form-control form-control-sm"
+           placeholder="مثلاً: بسته شدن زیر 58000"
+           value="{{ sc.invalidation if sc and sc.invalidation else '' }}">
+  </div>
+
+  <div class="col-12">
+    <label class="form-label fw-medium small">استدلال (Reasoning)</label>
+    <textarea name="reasoning" class="form-control form-control-sm" rows="3"
+              placeholder="دلیل این سناریو...">{{ sc.reasoning if sc and sc.reasoning else '' }}</textarea>
+  </div>
+</div>

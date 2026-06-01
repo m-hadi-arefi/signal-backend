@@ -12,6 +12,9 @@ from core.logger import log
 from core.dlq import DLQProducer
 from core.pipeline_logger import log_pipeline
 
+_HEARTBEAT_INTERVAL = 10   # seconds
+_HEARTBEAT_TTL      = 30   # Redis key TTL (seconds)
+
 # Services that return None from process_event as a normal "completed" signal
 _NONE_MEANS_COMPLETED = {"engine", "final_store"}
 
@@ -63,9 +66,7 @@ class BaseWorker(abc.ABC):
     def _current_step_name(self) -> str:
         mapping = {
             "engine": "engine",
-            "html_cleaner": "html",
             "ai_worker": "ai",
-            "serializer": "serialize",
             "final_store": "final",
         }
         return mapping.get(self.service_name, self.service_name)
@@ -116,12 +117,34 @@ class BaseWorker(abc.ABC):
                 # For now, we don't commit to avoid losing the message if DLQ is down
                 await asyncio.sleep(5)
 
+    async def _heartbeat_loop(self):
+        """Write a Redis heartbeat key every _HEARTBEAT_INTERVAL seconds."""
+        try:
+            import redis.asyncio as aioredis
+            r = aioredis.Redis(
+                host=os.getenv("REDIS_HOST", "redis"),
+                port=int(os.getenv("REDIS_PORT", 6379)),
+                decode_responses=True,
+            )
+            key = f"heartbeat:{self.service_name}"
+            while self.running:
+                try:
+                    await r.setex(key, _HEARTBEAT_TTL, "1")
+                except Exception:
+                    pass
+                await asyncio.sleep(_HEARTBEAT_INTERVAL)
+            await r.aclose()
+        except Exception as e:
+            print(f"[{self.service_name}] heartbeat init error: {e}")
+
     async def run(self):
         print(f"[{self.service_name}] starting on topic {self.topic}")
         self.clear_ready()
         await self.setup()
         self.running = True
-        
+
+        asyncio.create_task(self._heartbeat_loop())
+
         try:
             async for msg in self.consumer:
                 if not self.running:

@@ -10,48 +10,42 @@
 <div class="row g-3" id="health-grid">
   {% for svc, alive in health.items() %}
   {% set act = activity.get(svc, {}) %}
-  <div class="col-sm-6 col-md-4 col-xl-3">
-    <div class="card border-0 shadow-sm h-100 {% if alive %}border-success{% else %}border-danger{% endif %}" style="border-width:0 0 0 4px !important;border-style:solid !important">
+  <div class="col-sm-6 col-md-4 col-xl-3" id="card-{{ svc | replace('-','_') }}">
+    <div class="card border-0 shadow-sm h-100 svc-card {% if alive %}border-success{% else %}border-danger{% endif %}" style="border-width:0 0 0 4px !important;border-style:solid !important">
       <div class="card-body py-3 px-3">
         <div class="d-flex align-items-center gap-2 mb-2">
-          {% if alive %}
-            <i class="bi bi-check-circle-fill text-success fs-5 flex-shrink-0"></i>
-          {% else %}
-            <i class="bi bi-x-circle-fill text-danger fs-5 flex-shrink-0"></i>
-          {% endif %}
+          <i class="bi svc-icon {% if alive %}bi-check-circle-fill text-success{% else %}bi-x-circle-fill text-danger{% endif %} fs-5 flex-shrink-0"></i>
           <div class="fw-semibold text-truncate">{{ svc }}</div>
-          {% if alive %}
-            <span class="badge bg-success-subtle text-success ms-auto">ALIVE</span>
-          {% else %}
-            <span class="badge bg-danger-subtle text-danger ms-auto">DEAD</span>
-          {% endif %}
+          <span class="badge svc-badge ms-auto {% if alive %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %}">
+            {{ 'ALIVE' if alive else 'DEAD' }}
+          </span>
         </div>
         {% if act %}
-        <div class="row g-1 text-center small mt-1">
+        <div class="row g-1 text-center small mt-1 svc-stats">
           <div class="col-3">
             <div class="text-muted" style="font-size:.7rem">کل</div>
-            <div class="fw-bold">{{ act.total or 0 }}</div>
+            <div class="fw-bold svc-total">{{ act.total or 0 }}</div>
           </div>
           <div class="col-3">
             <div class="text-success" style="font-size:.7rem">تکمیل</div>
-            <div class="fw-bold text-success">{{ act.completed or 0 }}</div>
+            <div class="fw-bold text-success svc-completed">{{ act.completed or 0 }}</div>
           </div>
           <div class="col-3">
             <div class="text-warning" style="font-size:.7rem">دراپ</div>
-            <div class="fw-bold text-warning">{{ act.dropped or 0 }}</div>
+            <div class="fw-bold text-warning svc-dropped">{{ act.dropped or 0 }}</div>
           </div>
           <div class="col-3">
             <div class="text-danger" style="font-size:.7rem">خطا</div>
-            <div class="fw-bold text-danger">{{ act.errors or 0 }}</div>
+            <div class="fw-bold text-danger svc-errors">{{ act.errors or 0 }}</div>
           </div>
         </div>
         {% if act.last_activity %}
-        <div class="text-muted mt-2" style="font-size:.7rem">
+        <div class="text-muted mt-2 svc-last" style="font-size:.7rem">
           <i class="bi bi-clock me-1"></i>آخرین فعالیت: {{ act.last_activity.strftime('%H:%M:%S') }}
         </div>
         {% endif %}
         {% else %}
-        <div class="text-muted small mt-1">امروز فعالیتی ثبت نشده</div>
+        <div class="text-muted small mt-1 svc-stats">امروز فعالیتی ثبت نشده</div>
         {% endif %}
       </div>
     </div>
@@ -59,19 +53,56 @@
   {% endfor %}
 </div>
 
-{% set alive_count = [] %}
-{% for svc, alive in health.items() %}{% if alive %}{% set _ = alive_count.append(1) %}{% endif %}{% endfor %}
 <div class="mt-4 p-3 bg-white rounded-3 shadow-sm d-flex align-items-center gap-3">
   <i class="bi bi-info-circle text-info"></i>
   <span class="small text-muted">
-    {{ alive_count|length }} از {{ health|length }} سرویس فعال هستند.
-    وضعیت از طریق Redis heartbeat keys با TTL 10 ثانیه بررسی می‌شود.
+    وضعیت از طریق Redis heartbeat keys با TTL 30 ثانیه بررسی می‌شود.
   </span>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  setInterval(() => { location.reload(); }, 15000);
+function refreshHealth() {
+  fetch("{{ url_for('api_health_status') }}")
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      Object.entries(d.health).forEach(([svc, alive]) => {
+        const cardId = 'card-' + svc.replace(/-/g, '_');
+        const card = document.getElementById(cardId);
+        if (!card) return;
+        const inner = card.querySelector('.svc-card');
+        const icon = card.querySelector('.svc-icon');
+        const badge = card.querySelector('.svc-badge');
+        if (inner) {
+          inner.style.borderColor = alive ? '#198754' : '#dc3545';
+        }
+        if (icon) {
+          icon.className = 'bi fs-5 flex-shrink-0 svc-icon ' + (alive ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger');
+        }
+        if (badge) {
+          badge.className = 'badge svc-badge ms-auto ' + (alive ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger');
+          badge.textContent = alive ? 'ALIVE' : 'DEAD';
+        }
+        const act = d.activity[svc] || {};
+        const totalEl = card.querySelector('.svc-total');
+        const compEl = card.querySelector('.svc-completed');
+        const dropEl = card.querySelector('.svc-dropped');
+        const errEl = card.querySelector('.svc-errors');
+        const lastEl = card.querySelector('.svc-last');
+        if (totalEl) totalEl.textContent = act.total || 0;
+        if (compEl) compEl.textContent = act.completed || 0;
+        if (dropEl) dropEl.textContent = act.dropped || 0;
+        if (errEl) errEl.textContent = act.errors || 0;
+        if (lastEl && act.last_activity) lastEl.innerHTML = '<i class="bi bi-clock me-1"></i>آخرین فعالیت: ' + act.last_activity;
+      });
+      const ts = new Date().toLocaleTimeString('fa-IR');
+      const el = document.getElementById('last-refresh');
+      if (el) el.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>بروز: ' + ts;
+    })
+    .catch(() => {});
+}
+setInterval(refreshHealth, 15000);
 </script>
 {% endblock %}

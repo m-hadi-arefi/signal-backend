@@ -113,12 +113,18 @@ class ScenarioResult(Base):
         nullable=False,
     )
 
-    result       = Column(String(20), nullable=False)  # success / failed / running / expired
-    pnl_percent  = Column(Float)
-    hit_tp       = Column(Float)        # price at which TP was hit (nullable)
-    hit_sl       = Column(Float)        # price at which SL was hit (nullable)
-    max_drawdown = Column(Float)
-    evaluated_at = Column(DateTime)
+    # result lifecycle:
+    #   "running"  → being evaluated every 60s (entered_at NULL = waiting, NOT NULL = active)
+    #   "success"  → TP hit (best TP across all cycles wins)
+    #   "failed"   → SL hit
+    #   "expired"  → expired without TP/SL, or entry never reached
+    result       = Column(String(20), nullable=False)
+    pnl_percent  = Column(Float)   # live unrealized P&L while running; final P&L when terminal
+    hit_tp       = Column(Float)   # best TP price hit so far (progressive tracking)
+    hit_sl       = Column(Float)   # price at SL trigger; set once
+    max_drawdown = Column(Float)   # worst P&L seen since entry (negative = drawdown)
+    entered_at   = Column(DateTime)  # when entry condition was first confirmed; NULL = not yet entered
+    evaluated_at = Column(DateTime)  # timestamp of last evaluation cycle
 
     scenario = relationship("Scenario", back_populates="results")
 

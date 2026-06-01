@@ -5,27 +5,32 @@ import (
 	"strings"
 )
 
-// SignalsListCacheKey builds a deterministic cache key for paginated signal list queries.
-// Each unique combination of (page, limit, symbol, srcType, srcProvider) gets its own key.
-func SignalsListCacheKey(page, limit int, symbol, srcType, srcProvider string) string {
+// KeySignals builds a deterministic cache key for paginated signal lists.
+func KeySignals(page, limit int, symbol, provider string) string {
 	parts := []string{
 		fmt.Sprintf("p:%d", page),
 		fmt.Sprintf("l:%d", limit),
 	}
 	if symbol != "" {
-		parts = append(parts, "sym:"+symbol) // already uppercased by handler
+		parts = append(parts, "sym:"+strings.ToUpper(symbol))
 	}
-	if srcType != "" {
-		parts = append(parts, "type:"+srcType)
+	if provider != "" {
+		parts = append(parts, "prov:"+provider)
 	}
-	if srcProvider != "" {
-		parts = append(parts, "prov:"+srcProvider)
-	}
-	return "signals:list:" + strings.Join(parts, ":")
+	return "sig:list:" + strings.Join(parts, ":")
 }
 
-// SignalsResultsCacheKey is the results-variant — includes scenarios + scenario_results payload.
-func SignalsResultsCacheKey(page, limit int, symbol, srcType, srcProvider string) string {
-	key := SignalsListCacheKey(page, limit, symbol, srcType, srcProvider)
-	return strings.Replace(key, "signals:list:", "signals:results:", 1)
+// KeySignalByID builds a cache key for a single signal.
+func KeySignalByID(id int64) string {
+	return fmt.Sprintf("sig:id:%d", id)
+}
+
+// KeySources builds the cache key for the sources list.
+func KeySources() string {
+	return "sig:sources"
+}
+
+// KeyActiveCoins builds the cache key for the active coins list.
+func KeyActiveCoins() string {
+	return "sig:coins:active"
 }

@@ -3,6 +3,7 @@ Synchronous psycopg2 database layer for the Flask admin panel.
 Completely separate from the async SQLAlchemy/asyncpg used by workers.
 """
 import os
+import json as _json
 import psycopg2
 import psycopg2.extras
 from contextlib import contextmanager
@@ -333,29 +334,459 @@ def get_worker_activity() -> List[Dict]:
 
 # ── DLQ ───────────────────────────────────────────────────────────────────────
 
-def get_dlq_messages(limit: int = 100) -> List[Dict]:
+def get_dlq_messages(page: int = 1, per_page: int = 50) -> Dict[str, Any]:
+    offset = (page - 1) * per_page
     with _conn() as conn:
         cur = conn.cursor()
         cur.execute("""
-            SELECT pl.id, pl.trace_id, pl.event_type, pl.source_name,
-                   pl.service, pl.step, pl.status, pl.error_message, pl.created_at,
-                   e.data AS event_data
-            FROM pipeline_logs pl
-            LEFT JOIN events e ON pl.trace_id = e.trace_id
-            WHERE pl.status IN ('error', 'dropped')
-            ORDER BY pl.created_at DESC
-            LIMIT %s
-        """, (limit,))
-        return list(cur.fetchall())
+            SELECT id, trace_id, event_type, source_name,
+                   service, step, status, error_message, created_at
+            FROM pipeline_logs
+            WHERE status IN ('error', 'dropped')
+            ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
+        """, (per_page, offset))
+        rows = list(cur.fetchall())
+
+        cur.execute("""
+            SELECT COUNT(*) AS cnt FROM pipeline_logs
+            WHERE status IN ('error', 'dropped')
+        """)
+        total = cur.fetchone()["cnt"]
+
+    return {
+        "rows": rows,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": max(1, (total + per_page - 1) // per_page),
+    }
 
 
 def get_pipeline_log_by_id(log_id: int) -> Optional[Dict]:
     with _conn() as conn:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT pl.*, e.data AS event_data
-            FROM pipeline_logs pl
-            LEFT JOIN events e ON pl.trace_id = e.trace_id
-            WHERE pl.id = %s
-        """, (log_id,))
+        cur.execute("SELECT * FROM pipeline_logs WHERE id = %s", (log_id,))
         return cur.fetchone()
+
+
+def delete_pipeline_log(log_id: int) -> None:
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM pipeline_logs WHERE id = %s", (log_id,))
+
+
+# ── Signals viewer ────────────────────────────────────────────────────────────
+
+def _source_link(source: dict) -> Optional[str]:
+    """Construct a direct URL to the original source message/article."""
+    if not isinstance(source, dict):
+        return None
+    src_type = source.get("type")
+    if src_type == "telegram":
+        channel = source.get("channel", "")
+        msg_id = source.get("message_id")
+        if channel.startswith("@") and msg_id:
+            return f"https://t.me/{channel[1:]}/{msg_id}"
+    elif src_type == "scraper":
+        return source.get("url") or None
+    return None
+
+
+def get_signals(
+    page: int = 1,
+    per_page: int = 50,
+    symbol: Optional[str] = None,
+    source_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+) -> Dict[str, Any]:
+    conditions: List[str] = []
+    params: Dict = {}
+
+    if symbol:
+        conditions.append("symbol ILIKE %(symbol)s")
+        params["symbol"] = f"%{symbol}%"
+    if source_type:
+        conditions.append("source->>'type' = %(source_type)s")
+        params["source_type"] = source_type
+    if date_from:
+        conditions.append("created_at >= %(date_from)s")
+        params["date_from"] = date_from
+    if date_to:
+        conditions.append("created_at <= %(date_to)s::date + interval '1 day'")
+        params["date_to"] = date_to
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+    offset = (page - 1) * per_page
+    params.update({"limit": per_page, "offset": offset})
+
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT s.id, s.symbol, s.trace_id, s.source, s.raw_text,
+                   s.ai_summary, s.current_market_price, s.created_at, s.analyzed_at,
+                   COUNT(sc.id) AS scenario_count
+            FROM signals s
+            LEFT JOIN scenarios sc ON sc.signal_id = s.id
+            {where}
+            GROUP BY s.id
+            ORDER BY s.created_at DESC
+            LIMIT %(limit)s OFFSET %(offset)s
+        """, params)
+        rows = list(cur.fetchall())
+
+        cur.execute(f"SELECT COUNT(*) AS cnt FROM signals {where}", params)
+        total = cur.fetchone()["cnt"]
+
+    return {
+        "rows": rows,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": max(1, (total + per_page - 1) // per_page),
+    }
+
+
+def get_signal_detail(signal_id: int) -> Optional[Dict]:
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM signals WHERE id = %s", (signal_id,))
+        sig = cur.fetchone()
+        if not sig:
+            return None
+        cur.execute("""
+            SELECT sc.*, sr.result, sr.pnl_percent, sr.hit_tp, sr.hit_sl, sr.evaluated_at
+            FROM scenarios sc
+            LEFT JOIN scenario_results sr ON sr.scenario_id = sc.id
+            WHERE sc.signal_id = %s
+            ORDER BY sc.id
+        """, (signal_id,))
+        scenarios = list(cur.fetchall())
+        return {"signal": sig, "scenarios": scenarios}
+
+
+def get_signals_api(
+    page: int = 1,
+    per_page: int = 20,
+    symbol: Optional[str] = None,
+    source_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+) -> Dict[str, Any]:
+    """JSON-serialisable version of get_signals — adds computed source.link field."""
+    result = get_signals(
+        page=page, per_page=per_page,
+        symbol=symbol, source_type=source_type,
+        date_from=date_from, date_to=date_to,
+    )
+    rows = []
+    for row in result["rows"]:
+        source = row["source"] if isinstance(row["source"], dict) else {}
+        link = _source_link(source)
+        rows.append({
+            "id": row["id"],
+            "symbol": row["symbol"],
+            "trace_id": row["trace_id"],
+            "source": {**source, **({"link": link} if link else {})},
+            "ai_summary": row["ai_summary"],
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "analyzed_at": row["analyzed_at"].isoformat() if row["analyzed_at"] else None,
+            "scenario_count": row["scenario_count"],
+        })
+    result["rows"] = rows
+    return result
+
+
+def update_signal(signal_id: int, data: Dict) -> None:
+    with _conn() as conn:
+        cur = conn.cursor()
+
+        # Build source from structured fields submitted by the admin form
+        src_type = data.get("source_type") or ""
+        if src_type:
+            source_val: dict = {
+                "type": src_type,
+                "provider": (data.get("source_provider") or "").strip(),
+            }
+            if src_type == "telegram":
+                ch = (data.get("source_channel") or "").strip()
+                if ch:
+                    source_val["channel"] = ch
+                raw_mid = data.get("source_message_id") or ""
+                if raw_mid:
+                    try:
+                        source_val["message_id"] = int(raw_mid)
+                    except (ValueError, TypeError):
+                        pass
+            elif src_type == "scraper":
+                url = (data.get("source_url") or "").strip()
+                if url:
+                    source_val["url"] = url
+            elif src_type == "api":
+                ext_id = (data.get("source_external_id") or "").strip()
+                if ext_id:
+                    source_val["external_id"] = ext_id
+        else:
+            source_val = {}
+
+        price_val = data.get("current_market_price")
+        if isinstance(price_val, str):
+            try:
+                price_val = _json.loads(price_val) if price_val.strip() else None
+            except Exception:
+                price_val = None
+
+        cur.execute("""
+            UPDATE signals
+            SET symbol               = %(symbol)s,
+                source               = %(source)s,
+                ai_summary           = %(ai_summary)s,
+                raw_text             = %(raw_text)s,
+                current_market_price = %(current_market_price)s,
+                analyzed_at          = %(analyzed_at)s
+            WHERE id = %(id)s
+        """, {
+            "id": signal_id,
+            "symbol": data.get("symbol"),
+            "source": _json.dumps(source_val, ensure_ascii=False),
+            "ai_summary": data.get("ai_summary") or None,
+            "raw_text": data.get("raw_text") or None,
+            "current_market_price": _json.dumps(price_val, ensure_ascii=False) if price_val else None,
+            "analyzed_at": data.get("analyzed_at") or None,
+        })
+
+
+def delete_signal(signal_id: int) -> None:
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM signals WHERE id = %s", (signal_id,))
+
+
+def add_scenario(signal_id: int, data: Dict) -> None:
+    import json as _json
+    with _conn() as conn:
+        cur = conn.cursor()
+        tp = data.get("take_profits")
+        if isinstance(tp, str):
+            try:
+                tp = _json.loads(tp) if tp.strip() else []
+            except Exception:
+                tp = []
+        cur.execute("""
+            INSERT INTO scenarios
+                (signal_id, direction, entry_point, entry_type, take_profits,
+                 stop_loss, invalidation, confidence, reasoning, status)
+            VALUES
+                (%(signal_id)s, %(direction)s, %(entry_point)s, %(entry_type)s,
+                 %(take_profits)s, %(stop_loss)s, %(invalidation)s,
+                 %(confidence)s, %(reasoning)s, %(status)s)
+        """, {
+            "signal_id": signal_id,
+            "direction": data.get("direction") or None,
+            "entry_point": _float_or_none(data.get("entry_point")),
+            "entry_type": data.get("entry_type") or None,
+            "take_profits": _json.dumps(tp, ensure_ascii=False),
+            "stop_loss": _float_or_none(data.get("stop_loss")),
+            "invalidation": data.get("invalidation") or None,
+            "confidence": _float_or_none(data.get("confidence")),
+            "reasoning": data.get("reasoning") or None,
+            "status": data.get("status") or "running",
+        })
+
+
+def update_scenario(scenario_id: int, data: Dict) -> None:
+    import json as _json
+    with _conn() as conn:
+        cur = conn.cursor()
+        tp = data.get("take_profits")
+        if isinstance(tp, str):
+            try:
+                tp = _json.loads(tp) if tp.strip() else []
+            except Exception:
+                tp = []
+        cur.execute("""
+            UPDATE scenarios
+            SET direction    = %(direction)s,
+                entry_point  = %(entry_point)s,
+                entry_type   = %(entry_type)s,
+                take_profits = %(take_profits)s,
+                stop_loss    = %(stop_loss)s,
+                invalidation = %(invalidation)s,
+                confidence   = %(confidence)s,
+                reasoning    = %(reasoning)s,
+                status       = %(status)s
+            WHERE id = %(id)s
+        """, {
+            "id": scenario_id,
+            "direction": data.get("direction") or None,
+            "entry_point": _float_or_none(data.get("entry_point")),
+            "entry_type": data.get("entry_type") or None,
+            "take_profits": _json.dumps(tp, ensure_ascii=False),
+            "stop_loss": _float_or_none(data.get("stop_loss")),
+            "invalidation": data.get("invalidation") or None,
+            "confidence": _float_or_none(data.get("confidence")),
+            "reasoning": data.get("reasoning") or None,
+            "status": data.get("status") or "running",
+        })
+
+
+def delete_scenario(scenario_id: int) -> None:
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM scenarios WHERE id = %s", (scenario_id,))
+
+
+def _float_or_none(val) -> Optional[float]:
+    try:
+        return float(val) if val not in (None, "", "None") else None
+    except (ValueError, TypeError):
+        return None
+
+
+# ── Telegram Sources ──────────────────────────────────────────────────────────
+
+def _ensure_telegram_sources_table(cur) -> None:
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS telegram_sources (
+            id         SERIAL PRIMARY KEY,
+            name       VARCHAR(255) NOT NULL UNIQUE,
+            channel    VARCHAR(255) NOT NULL UNIQUE,
+            is_active  BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+
+def get_telegram_sources() -> List[Dict]:
+    with _conn() as conn:
+        cur = conn.cursor()
+        _ensure_telegram_sources_table(cur)
+        cur.execute("SELECT * FROM telegram_sources ORDER BY id")
+        return list(cur.fetchall())
+
+
+def add_telegram_source(data: Dict) -> None:
+    with _conn() as conn:
+        cur = conn.cursor()
+        _ensure_telegram_sources_table(cur)
+        cur.execute("""
+            INSERT INTO telegram_sources (name, channel, is_active, created_at)
+            VALUES (%(name)s, %(channel)s, %(is_active)s, NOW())
+        """, data)
+
+
+def update_telegram_source(source_id: int, data: Dict) -> None:
+    with _conn() as conn:
+        cur = conn.cursor()
+        _ensure_telegram_sources_table(cur)
+        cur.execute("""
+            UPDATE telegram_sources
+            SET name=%(name)s, channel=%(channel)s, is_active=%(is_active)s
+            WHERE id=%(id)s
+        """, {**data, "id": source_id})
+
+
+def delete_telegram_source(source_id: int) -> None:
+    with _conn() as conn:
+        cur = conn.cursor()
+        _ensure_telegram_sources_table(cur)
+        cur.execute("DELETE FROM telegram_sources WHERE id = %s", (source_id,))
+
+
+# ── Tracked Coins ─────────────────────────────────────────────────────────────
+
+def _ensure_tracked_coins_table(cur) -> None:
+    """Safety net: migration creates the table, but this guards against missing migration."""
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tracked_coins (
+            id        SERIAL PRIMARY KEY,
+            symbol    VARCHAR(20)  NOT NULL UNIQUE,
+            name      VARCHAR(255) NOT NULL DEFAULT '',
+            fa_name   VARCHAR(255) NOT NULL DEFAULT '',
+            is_active BOOLEAN      NOT NULL DEFAULT TRUE
+        )
+    """)
+
+
+def get_tracked_coins(
+    page: int = 1,
+    per_page: int = 50,
+    search: Optional[str] = None,
+    active_only: Optional[bool] = None,
+) -> Dict[str, Any]:
+    conditions: List[str] = []
+    params: Dict = {}
+    if search:
+        conditions.append(
+            "(symbol ILIKE %(search)s OR name ILIKE %(search)s OR fa_name ILIKE %(search)s)"
+        )
+        params["search"] = f"%{search}%"
+    if active_only is True:
+        conditions.append("is_active = TRUE")
+    elif active_only is False:
+        conditions.append("is_active = FALSE")
+
+    where  = "WHERE " + " AND ".join(conditions) if conditions else ""
+    offset = (page - 1) * per_page
+    params.update({"limit": per_page, "offset": offset})
+
+    with _conn() as conn:
+        cur = conn.cursor()
+        _ensure_tracked_coins_table(cur)
+        cur.execute(
+            f"SELECT * FROM tracked_coins {where} ORDER BY symbol LIMIT %(limit)s OFFSET %(offset)s",
+            params,
+        )
+        rows = list(cur.fetchall())
+        cur.execute(f"SELECT COUNT(*) AS cnt FROM tracked_coins {where}", params)
+        total = cur.fetchone()["cnt"]
+        cur.execute("SELECT COUNT(*) AS cnt FROM tracked_coins WHERE is_active = TRUE")
+        active_count = cur.fetchone()["cnt"]
+
+    return {
+        "rows": rows,
+        "total": total,
+        "active_count": active_count,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": max(1, (total + per_page - 1) // per_page),
+    }
+
+
+def set_coin_active(symbol: str, is_active: bool) -> None:
+    with _conn() as conn:
+        cur = conn.cursor()
+        _ensure_tracked_coins_table(cur)
+        cur.execute(
+            "UPDATE tracked_coins SET is_active = %s WHERE symbol = %s",
+            (is_active, symbol.lower()),
+        )
+
+
+def bulk_set_coins_active(symbols: List[str], is_active: bool) -> None:
+    if not symbols:
+        return
+    symbols = [s.lower() for s in symbols]
+    with _conn() as conn:
+        cur = conn.cursor()
+        _ensure_tracked_coins_table(cur)
+        cur.execute(
+            "UPDATE tracked_coins SET is_active = %s WHERE symbol = ANY(%s)",
+            (is_active, symbols),
+        )
+
+
+def set_all_coins_active(is_active: bool) -> None:
+    with _conn() as conn:
+        cur = conn.cursor()
+        _ensure_tracked_coins_table(cur)
+        cur.execute("UPDATE tracked_coins SET is_active = %s", (is_active,))
+
+
+def get_active_coin_symbols() -> List[str]:
+    with _conn() as conn:
+        cur = conn.cursor()
+        _ensure_tracked_coins_table(cur)
+        cur.execute("SELECT symbol FROM tracked_coins WHERE is_active = TRUE")
+        return [row["symbol"] for row in cur.fetchall()]

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -11,13 +12,12 @@ import (
 	"signal/api/internal/repository"
 )
 
-// ErrorResponse is the standard error body returned on 4xx/5xx responses.
+// ErrorResponse is the standard error body.
 type ErrorResponse struct {
-	Error      string `json:"error"                  example:"query timeout"`
-	RetryAfter int    `json:"retry_after,omitempty"  example:"1"`
+	Error string `json:"error" example:"query timeout"`
 }
 
-// SignalHandler serves all /v1/signals endpoints.
+// SignalHandler serves all /v1/signals, /v1/coins, /v1/sources endpoints.
 type SignalHandler struct {
 	repo  *repository.SignalRepository
 	cache *cache.Cache
@@ -27,172 +27,209 @@ func NewSignalHandler(repo *repository.SignalRepository, c *cache.Cache) *Signal
 	return &SignalHandler{repo: repo, cache: c}
 }
 
-// ------------------------------------------------------------------ //
-// Route handlers                                                       //
-// ------------------------------------------------------------------ //
+// ─── Signal endpoints ─────────────────────────────────────────────────────────
 
 // List godoc
 //
-//	@Summary		List signals
-//	@Description	Returns a paginated list of trading signals. Scenarios and results are NOT included.
-//	@Description	Results are cached in Redis (TTL configurable, default 30s). Cache state is exposed via X-Cache header.
+//	@Summary		List all signals
+//	@Description	Paginated list of signals with scenarios, evaluation results and source info. raw_text is never returned.
 //	@Tags			signals
 //	@Produce		json
-//	@Param			page				query		int		false	"Page number (1-based)"								minimum(1)		default(1)
-//	@Param			limit				query		int		false	"Items per page"									minimum(1)		maximum(200)	default(20)
-//	@Param			symbol				query		string	false	"Filter by trading pair, case-insensitive (e.g. btcusdt or BTCUSDT)"
-//	@Param			source_type			query		string	false	"Filter by source type (e.g. telegram, rss, http)"
-//	@Param			source_provider		query		string	false	"Filter by source provider name"
-//	@Success		200					{object}	repository.SignalsPage						"Paginated signal list"
-//	@Failure		408					{object}	handler.ErrorResponse						"DB query exceeded 5s timeout"
-//	@Failure		429					{object}	handler.ErrorResponse						"Global rate limit exceeded"
-//	@Failure		500					{object}	handler.ErrorResponse						"Internal server error"
-//	@Failure		503					{object}	handler.ErrorResponse						"Server at capacity – concurrency limit hit"
-//	@Header			200					{string}	X-Cache									"Cache state: HIT or MISS"
+//	@Param			page			query	int		false	"Page (1-based)"	default(1)
+//	@Param			limit			query	int		false	"Per page"			default(20)	maximum(200)
+//	@Success		200	{object}	repository.SignalsPage
+//	@Failure		408	{object}	ErrorResponse
+//	@Failure		500	{object}	ErrorResponse
+//	@Header			200	{string}	X-Cache	"HIT or MISS"
 //	@Router			/v1/signals [get]
 func (h *SignalHandler) List(c *fiber.Ctx) error {
 	p := h.parseParams(c)
-	key := cache.SignalsListCacheKey(p.Page, p.Limit, p.Symbol, p.SrcType, p.SrcProvider)
-	return h.serveList(c, key, p, false)
+	key := cache.KeySignals(p.Page, p.Limit, "", "")
+	return h.serveSignals(c, key, func(ctx context.Context) (*repository.SignalsPage, error) {
+		return h.repo.List(ctx, p)
+	})
 }
 
-// ListBySymbol godoc
+// GetByID godoc
 //
-//	@Summary		List signals by symbol
-//	@Description	Returns a paginated list of signals filtered by the given trading pair symbol.
-//	@Description	Symbol matching is case-insensitive on input; stored values are uppercase (e.g. BTCUSDT).
+//	@Summary		Get signal by ID
+//	@Description	Returns full signal detail including all scenarios and their latest evaluation result.
 //	@Tags			signals
 //	@Produce		json
-//	@Param			symbol				path		string	true	"Trading pair symbol (e.g. BTCUSDT)"
-//	@Param			page				query		int		false	"Page number (1-based)"				minimum(1)	default(1)
-//	@Param			limit				query		int		false	"Items per page"					minimum(1)	maximum(200)	default(20)
-//	@Param			source_type			query		string	false	"Filter by source type"
-//	@Param			source_provider		query		string	false	"Filter by source provider"
-//	@Success		200					{object}	repository.SignalsPage					"Paginated signal list"
-//	@Failure		408					{object}	handler.ErrorResponse					"DB query exceeded 5s timeout"
-//	@Failure		429					{object}	handler.ErrorResponse					"Global rate limit exceeded"
-//	@Failure		500					{object}	handler.ErrorResponse					"Internal server error"
-//	@Failure		503					{object}	handler.ErrorResponse					"Server at capacity"
-//	@Header			200					{string}	X-Cache								"Cache state: HIT or MISS"
-//	@Router			/v1/signals/{symbol} [get]
-func (h *SignalHandler) ListBySymbol(c *fiber.Ctx) error {
+//	@Param			id	path	int	true	"Signal ID"
+//	@Success		200	{object}	repository.Signal
+//	@Failure		404	{object}	ErrorResponse
+//	@Failure		408	{object}	ErrorResponse
+//	@Failure		500	{object}	ErrorResponse
+//	@Header			200	{string}	X-Cache	"HIT or MISS"
+//	@Router			/v1/signals/{id} [get]
+func (h *SignalHandler) GetByID(c *fiber.Ctx) error {
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid id"})
+	}
+
+	key := cache.KeySignalByID(id)
+
+	if raw, err := h.cache.GetRaw(c.UserContext(), key); err == nil {
+		c.Set("X-Cache", "HIT")
+		c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSONCharsetUTF8)
+		return c.Send(raw)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+
+	signal, err := h.repo.GetByID(ctx, id)
+	if err != nil {
+		return h.dbError(c, err)
+	}
+	if signal == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "signal not found"})
+	}
+
+	go func() {
+		wCtx, wCancel := context.WithTimeout(context.Background(), writeTimeout)
+		defer wCancel()
+		_ = h.cache.Set(wCtx, key, signal)
+	}()
+
+	c.Set("X-Cache", "MISS")
+	return c.JSON(signal)
+}
+
+// ListByCoin godoc
+//
+//	@Summary		Signals for a coin
+//	@Description	Paginated signals filtered by coin symbol (case-insensitive).
+//	@Tags			signals
+//	@Produce		json
+//	@Param			symbol	path	string	true	"Coin symbol, e.g. BTC or ETH"
+//	@Param			page	query	int		false	"Page"	default(1)
+//	@Param			limit	query	int		false	"Per page"	default(20)	maximum(200)
+//	@Success		200	{object}	repository.SignalsPage
+//	@Failure		408	{object}	ErrorResponse
+//	@Failure		500	{object}	ErrorResponse
+//	@Header			200	{string}	X-Cache	"HIT or MISS"
+//	@Router			/v1/signals/coin/{symbol} [get]
+func (h *SignalHandler) ListByCoin(c *fiber.Ctx) error {
+	symbol := strings.ToUpper(c.Params("symbol"))
 	p := h.parseParams(c)
-	p.Symbol = strings.ToUpper(c.Params("symbol"))
-	key := cache.SignalsListCacheKey(p.Page, p.Limit, p.Symbol, p.SrcType, p.SrcProvider)
-	return h.serveList(c, key, p, false)
+	key := cache.KeySignals(p.Page, p.Limit, symbol, "")
+	return h.serveSignals(c, key, func(ctx context.Context) (*repository.SignalsPage, error) {
+		return h.repo.ListByCoin(ctx, symbol, p)
+	})
+}
+
+// ─── Source endpoints ─────────────────────────────────────────────────────────
+
+// ListSources godoc
+//
+//	@Summary		List signal sources
+//	@Description	Returns all unique source providers that have submitted signals, with signal count and last activity.
+//	@Tags			sources
+//	@Produce		json
+//	@Success		200	{object}	repository.SourcesPage
+//	@Failure		408	{object}	ErrorResponse
+//	@Failure		500	{object}	ErrorResponse
+//	@Header			200	{string}	X-Cache	"HIT or MISS"
+//	@Router			/v1/sources [get]
+func (h *SignalHandler) ListSources(c *fiber.Ctx) error {
+	key := cache.KeySources()
+
+	if raw, err := h.cache.GetRaw(c.UserContext(), key); err == nil {
+		c.Set("X-Cache", "HIT")
+		c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSONCharsetUTF8)
+		return c.Send(raw)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+
+	result, err := h.repo.ListSources(ctx)
+	if err != nil {
+		return h.dbError(c, err)
+	}
+
+	go func() {
+		wCtx, wCancel := context.WithTimeout(context.Background(), writeTimeout)
+		defer wCancel()
+		_ = h.cache.Set(wCtx, key, result)
+	}()
+
+	c.Set("X-Cache", "MISS")
+	return c.JSON(result)
 }
 
 // ListByProvider godoc
 //
-//	@Summary		List signals by source provider
-//	@Description	Returns a paginated list of signals filtered by the source provider name.
-//	@Tags			signals
+//	@Summary		Signals from a source
+//	@Description	Paginated signals submitted by the given source provider.
+//	@Tags			sources
 //	@Produce		json
-//	@Param			provider			path		string	true	"Source provider name (e.g. binance, coinbase, my_channel)"
-//	@Param			page				query		int		false	"Page number (1-based)"				minimum(1)	default(1)
-//	@Param			limit				query		int		false	"Items per page"					minimum(1)	maximum(200)	default(20)
-//	@Param			symbol				query		string	false	"Filter by trading pair"
-//	@Param			source_type			query		string	false	"Filter by source type"
-//	@Success		200					{object}	repository.SignalsPage					"Paginated signal list"
-//	@Failure		408					{object}	handler.ErrorResponse					"DB query exceeded 5s timeout"
-//	@Failure		429					{object}	handler.ErrorResponse					"Global rate limit exceeded"
-//	@Failure		500					{object}	handler.ErrorResponse					"Internal server error"
-//	@Failure		503					{object}	handler.ErrorResponse					"Server at capacity"
-//	@Header			200					{string}	X-Cache								"Cache state: HIT or MISS"
-//	@Router			/v1/signals/source/{provider} [get]
+//	@Param			provider	path	string	true	"Source provider name"
+//	@Param			page		query	int		false	"Page"		default(1)
+//	@Param			limit		query	int		false	"Per page"	default(20)	maximum(200)
+//	@Success		200	{object}	repository.SignalsPage
+//	@Failure		408	{object}	ErrorResponse
+//	@Failure		500	{object}	ErrorResponse
+//	@Header			200	{string}	X-Cache	"HIT or MISS"
+//	@Router			/v1/sources/{provider}/signals [get]
 func (h *SignalHandler) ListByProvider(c *fiber.Ctx) error {
+	provider := c.Params("provider")
 	p := h.parseParams(c)
-	p.SrcProvider = c.Params("provider")
-	key := cache.SignalsListCacheKey(p.Page, p.Limit, p.Symbol, p.SrcType, p.SrcProvider)
-	return h.serveList(c, key, p, false)
+	key := cache.KeySignals(p.Page, p.Limit, "", provider)
+	return h.serveSignals(c, key, func(ctx context.Context) (*repository.SignalsPage, error) {
+		return h.repo.ListByProvider(ctx, provider, p)
+	})
 }
 
-// ListWithResults godoc
+// ─── Coins endpoint ───────────────────────────────────────────────────────────
+
+// ListActiveCoins godoc
 //
-//	@Summary		List signals with scenarios and results
-//	@Description	Returns a paginated list of signals with full nested data: each Signal includes its Scenarios,
-//	@Description	and each Scenario includes its ScenarioResults. Uses 3 DB queries total (no N+1).
-//	@Tags			signals
+//	@Summary		Active tracked coins
+//	@Description	Returns all coins the admin has enabled for signal tracking.
+//	@Tags			coins
 //	@Produce		json
-//	@Param			page				query		int		false	"Page number (1-based)"							minimum(1)	default(1)
-//	@Param			limit				query		int		false	"Items per page"								minimum(1)	maximum(200)	default(20)
-//	@Param			symbol				query		string	false	"Filter by trading pair"
-//	@Param			source_type			query		string	false	"Filter by source type"
-//	@Param			source_provider		query		string	false	"Filter by source provider"
-//	@Success		200					{object}	repository.SignalsPage						"Paginated signal list with nested scenarios and results"
-//	@Failure		408					{object}	handler.ErrorResponse						"DB query exceeded 5s timeout"
-//	@Failure		429					{object}	handler.ErrorResponse						"Global rate limit exceeded"
-//	@Failure		500					{object}	handler.ErrorResponse						"Internal server error"
-//	@Failure		503					{object}	handler.ErrorResponse						"Server at capacity"
-//	@Header			200					{string}	X-Cache									"Cache state: HIT or MISS"
-//	@Router			/v1/signals/results [get]
-func (h *SignalHandler) ListWithResults(c *fiber.Ctx) error {
-	p := h.parseParams(c)
-	key := cache.SignalsResultsCacheKey(p.Page, p.Limit, p.Symbol, p.SrcType, p.SrcProvider)
-	return h.serveList(c, key, p, true)
+//	@Success		200	{object}	repository.CoinsPage
+//	@Failure		408	{object}	ErrorResponse
+//	@Failure		500	{object}	ErrorResponse
+//	@Header			200	{string}	X-Cache	"HIT or MISS"
+//	@Router			/v1/coins/active [get]
+func (h *SignalHandler) ListActiveCoins(c *fiber.Ctx) error {
+	key := cache.KeyActiveCoins()
+
+	if raw, err := h.cache.GetRaw(c.UserContext(), key); err == nil {
+		c.Set("X-Cache", "HIT")
+		c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSONCharsetUTF8)
+		return c.Send(raw)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+
+	result, err := h.repo.ListActiveCoins(ctx)
+	if err != nil {
+		return h.dbError(c, err)
+	}
+
+	go func() {
+		wCtx, wCancel := context.WithTimeout(context.Background(), writeTimeout)
+		defer wCancel()
+		_ = h.cache.Set(wCtx, key, result)
+	}()
+
+	c.Set("X-Cache", "MISS")
+	return c.JSON(result)
 }
 
-// ListBySymbolWithResults godoc
-//
-//	@Summary		List signals by symbol with scenarios and results
-//	@Description	Returns a paginated list of signals for a specific trading pair, with full nested scenarios and results.
-//	@Tags			signals
-//	@Produce		json
-//	@Param			symbol				path		string	true	"Trading pair symbol (e.g. BTCUSDT)"
-//	@Param			page				query		int		false	"Page number (1-based)"					minimum(1)	default(1)
-//	@Param			limit				query		int		false	"Items per page"						minimum(1)	maximum(200)	default(20)
-//	@Param			source_type			query		string	false	"Filter by source type"
-//	@Param			source_provider		query		string	false	"Filter by source provider"
-//	@Success		200					{object}	repository.SignalsPage						"Paginated signal list with nested scenarios and results"
-//	@Failure		408					{object}	handler.ErrorResponse						"DB query exceeded 5s timeout"
-//	@Failure		429					{object}	handler.ErrorResponse						"Global rate limit exceeded"
-//	@Failure		500					{object}	handler.ErrorResponse						"Internal server error"
-//	@Failure		503					{object}	handler.ErrorResponse						"Server at capacity"
-//	@Header			200					{string}	X-Cache									"Cache state: HIT or MISS"
-//	@Router			/v1/signals/{symbol}/results [get]
-func (h *SignalHandler) ListBySymbolWithResults(c *fiber.Ctx) error {
-	p := h.parseParams(c)
-	p.Symbol = strings.ToUpper(c.Params("symbol"))
-	key := cache.SignalsResultsCacheKey(p.Page, p.Limit, p.Symbol, p.SrcType, p.SrcProvider)
-	return h.serveList(c, key, p, true)
-}
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 
-// ListByProviderWithResults godoc
-//
-//	@Summary		List signals by provider with scenarios and results
-//	@Description	Returns a paginated list of signals for a specific source provider, with full nested scenarios and results.
-//	@Tags			signals
-//	@Produce		json
-//	@Param			provider			path		string	true	"Source provider name"
-//	@Param			page				query		int		false	"Page number (1-based)"					minimum(1)	default(1)
-//	@Param			limit				query		int		false	"Items per page"						minimum(1)	maximum(200)	default(20)
-//	@Param			symbol				query		string	false	"Filter by trading pair"
-//	@Param			source_type			query		string	false	"Filter by source type"
-//	@Success		200					{object}	repository.SignalsPage						"Paginated signal list with nested scenarios and results"
-//	@Failure		408					{object}	handler.ErrorResponse						"DB query exceeded 5s timeout"
-//	@Failure		429					{object}	handler.ErrorResponse						"Global rate limit exceeded"
-//	@Failure		500					{object}	handler.ErrorResponse						"Internal server error"
-//	@Failure		503					{object}	handler.ErrorResponse						"Server at capacity"
-//	@Header			200					{string}	X-Cache									"Cache state: HIT or MISS"
-//	@Router			/v1/signals/source/{provider}/results [get]
-func (h *SignalHandler) ListByProviderWithResults(c *fiber.Ctx) error {
-	p := h.parseParams(c)
-	p.SrcProvider = c.Params("provider")
-	key := cache.SignalsResultsCacheKey(p.Page, p.Limit, p.Symbol, p.SrcType, p.SrcProvider)
-	return h.serveList(c, key, p, true)
-}
-
-// ------------------------------------------------------------------ //
-// Shared logic                                                         //
-// ------------------------------------------------------------------ //
-
-// serveList is the common path for all signal list endpoints.
-// withResults=true includes Scenarios and ScenarioResults.
-func (h *SignalHandler) serveList(
+func (h *SignalHandler) serveSignals(
 	c *fiber.Ctx,
 	cacheKey string,
-	p repository.SignalListParams,
-	withResults bool,
+	query func(context.Context) (*repository.SignalsPage, error),
 ) error {
 	if raw, err := h.cache.GetRaw(c.UserContext(), cacheKey); err == nil {
 		c.Set("X-Cache", "HIT")
@@ -205,23 +242,15 @@ func (h *SignalHandler) serveList(
 	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
 	defer cancel()
 
-	var (
-		result *repository.SignalsPage
-		err    error
-	)
-	if withResults {
-		result, err = h.repo.ListWithResults(ctx, p)
-	} else {
-		result, err = h.repo.List(ctx, p)
-	}
+	result, err := query(ctx)
 	if err != nil {
-		return h.handleDBError(c, err)
+		return h.dbError(c, err)
 	}
 
-	go func(val *repository.SignalsPage) {
+	go func(v *repository.SignalsPage) {
 		wCtx, wCancel := context.WithTimeout(context.Background(), writeTimeout)
 		defer wCancel()
-		if err := h.cache.Set(wCtx, cacheKey, val); err != nil {
+		if err := h.cache.Set(wCtx, cacheKey, v); err != nil {
 			log.Printf("cache set %q: %v", cacheKey, err)
 		}
 	}(result)
@@ -230,14 +259,9 @@ func (h *SignalHandler) serveList(
 	return c.JSON(result)
 }
 
-// ------------------------------------------------------------------ //
-// Parameter parsing                                                    //
-// ------------------------------------------------------------------ //
-
 func (h *SignalHandler) parseParams(c *fiber.Ctx) repository.SignalListParams {
 	limit := c.QueryInt("limit", defaultLimit)
 	page  := c.QueryInt("page", 1)
-
 	if limit < 1 {
 		limit = defaultLimit
 	}
@@ -247,28 +271,13 @@ func (h *SignalHandler) parseParams(c *fiber.Ctx) repository.SignalListParams {
 	if page < 1 {
 		page = 1
 	}
-
-	return repository.SignalListParams{
-		Page:        page,
-		Limit:       limit,
-		Symbol:      strings.ToUpper(c.Query("symbol")), // DB stores uppercase
-		SrcType:     c.Query("source_type"),
-		SrcProvider: c.Query("source_provider"),
-	}
+	return repository.SignalListParams{Page: page, Limit: limit}
 }
 
-// ------------------------------------------------------------------ //
-// Error handling                                                       //
-// ------------------------------------------------------------------ //
-
-func (h *SignalHandler) handleDBError(c *fiber.Ctx, err error) error {
+func (h *SignalHandler) dbError(c *fiber.Ctx, err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
-		return c.Status(fiber.StatusGatewayTimeout).JSON(fiber.Map{
-			"error": "query timeout",
-		})
+		return c.Status(fiber.StatusGatewayTimeout).JSON(fiber.Map{"error": "query timeout"})
 	}
-	log.Printf("signals query error: %v", err)
-	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-		"error": "failed to fetch signals",
-	})
+	log.Printf("db error: %v", err)
+	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 }

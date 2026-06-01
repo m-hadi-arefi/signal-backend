@@ -5,7 +5,7 @@ import re
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -13,7 +13,6 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 
-CLAUDE_AGENT   = "crypto-parser"
 CLAUDE_TIMEOUT = 90    # seconds — 3× the ~30s worst-case Claude response time
 MAX_CONCURRENT = 10    # semaphore cap: controls max parallel CLI processes
 
@@ -49,6 +48,42 @@ app = FastAPI(title="Crypto Parser API", version="2.0.0", lifespan=lifespan)
 _DIRECTIONS    = {"up", "down"}
 _EXPIRE_TIMES  = {"1d", "3d", "1w", "2w", "1m", "3m", "1y"}
 _ENTRY_TYPES   = {"fix", "break_up", "break_down", "consolidation_up", "consolidation_down"}
+_PRICE_TYPES   = {"fixnumber", "range"}
+_TIMEFRAMES    = {"1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w", "1M"}
+
+_COIN_TF_DEFAULTS: dict[str, str] = {
+    # Major
+    "BTC": "4h", "ETH": "4h",
+    # Top alts
+    "BNB": "4h", "SOL": "4h", "XRP": "4h", "ADA": "4h", "AVAX": "4h",
+    "DOT": "4h", "MATIC": "4h", "LINK": "1h", "ATOM": "1h", "NEAR": "1h",
+    "LTC": "1h", "BCH": "1h", "ETC": "1h", "ALGO": "1h",
+    # Memes
+    "DOGE": "1h", "SHIB": "1h", "PEPE": "1h", "FLOKI": "1h", "BONK": "1h",
+    # Gold tokens
+    "PAXG": "1d", "XAUT": "1d",
+}
+
+
+def _infer_timeframe(symbol: str, entry: str, sl: str) -> str:
+    """Fallback timeframe from sl/entry distance, then coin-type default."""
+    try:
+        e = float(entry.replace(",", ""))
+        s = float(sl.replace(",", ""))
+        if e > 0 and s > 0:
+            dist = abs(e - s) / e * 100
+            if dist < 0.5:
+                return "15m"
+            if dist < 2:
+                return "1h"
+            if dist < 5:
+                return "4h"
+            if dist < 15:
+                return "1d"
+            return "1w"
+    except (ValueError, ZeroDivisionError):
+        pass
+    return _COIN_TF_DEFAULTS.get(symbol.upper(), "4h")
 
 # ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -61,6 +96,8 @@ class Scenario(BaseModel):
     tp:               List[str] = []
     sl:               str       = ""
     reason:           str       = ""
+    type:             str       = "fixnumber"
+    timeframe:        Optional[str] = None
 
     @field_validator("direction", mode="before")
     @classmethod
@@ -89,6 +126,16 @@ class Scenario(BaseModel):
     def _v_entry(cls, v):
         return "now" if v is None else str(v).strip()
 
+    @field_validator("type", mode="before")
+    @classmethod
+    def _v_type(cls, v):
+        return v if v in _PRICE_TYPES else "fixnumber"
+
+    @field_validator("timeframe", mode="before")
+    @classmethod
+    def _v_timeframe(cls, v):
+        return v if v in _TIMEFRAMES else None  # None = needs post-fill by SignalItem
+
 
 class SignalItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -107,6 +154,12 @@ class SignalItem(BaseModel):
         if not isinstance(v, list):
             return []
         return v
+
+    def model_post_init(self, __context: Any) -> None:
+        """Fill in missing timeframes using sl/entry distance or coin defaults."""
+        for s in self.senarios:
+            if not s.timeframe:
+                s.timeframe = _infer_timeframe(self.symbol, s.entry_point, s.sl)
 
 
 # ─── JSON extraction ──────────────────────────────────────────────────────────
@@ -157,11 +210,13 @@ async def call_claude(prompt: str, req_id: str) -> str:
         t0 = time.monotonic()
         log.info("[%s] claude start — concurrent=%d/%d", req_id, slots_used, MAX_CONCURRENT)
 
-        # Interactive mode (no -p): behaves exactly like typing in terminal.
-        # Prompt is written to stdin; CLI exits when stdin closes (EOF).
+        # Prefix with /parse-signal to trigger the skill, then send the actual prompt.
+        # CLI reads from stdin; exits when stdin closes (EOF).
+        full_input = f"/parse-signal {prompt}"
         proc = await asyncio.create_subprocess_exec(
             "claude",
-            "--agent", CLAUDE_AGENT,
+            "--print",
+            "--output-format", "text",
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -169,7 +224,7 @@ async def call_claude(prompt: str, req_id: str) -> str:
 
         try:
             stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=prompt.encode("utf-8")), timeout=CLAUDE_TIMEOUT
+                proc.communicate(input=full_input.encode("utf-8")), timeout=CLAUDE_TIMEOUT
             )
         except asyncio.TimeoutError:
             proc.kill()

@@ -1,107 +1,180 @@
 {% extends "base.html" %}
-{% block title %}جزئیات پیام{% endblock %}
+{% block title %}مسیر پیام{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-  <a href="{{ url_for('messages') }}" class="btn btn-sm btn-outline-secondary mb-3">
+<div class="mb-4 d-flex align-items-center gap-3">
+  <a href="{{ url_for('messages') }}" class="btn btn-sm btn-outline-secondary">
     <i class="bi bi-arrow-right me-1"></i>بازگشت
   </a>
-  <h4 class="fw-bold mb-1">مسیر پیام</h4>
-  <code class="text-muted">{{ trace_id }}</code>
+  <div>
+    <h5 class="fw-bold mb-0">مسیر پیام</h5>
+    <code class="text-muted small">{{ trace_id }}</code>
+  </div>
 </div>
 
-{% if steps %}
+{% if not steps %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-inbox fs-2 d-block mb-2"></i>هیچ رویدادی برای این trace ID پیدا نشد
+</div>
+{% else %}
+
 {% set first = steps[0] %}
+
+<!-- Summary card -->
 <div class="card border-0 shadow-sm mb-4">
-  <div class="card-body d-flex flex-wrap gap-4">
-    <div>
-      <div class="text-muted small">نوع</div>
-      <strong>{{ first.event_type if first.get('event_type') else '—' }}</strong>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-sm-3">
+        <div class="text-muted small mb-1">نوع رویداد</div>
+        {% if first.get('event_type') == 'telegram.message' %}
+          <span class="badge" style="background:#e8f5e9;color:#2e7d32;font-size:.85rem"><i class="bi bi-telegram me-1"></i>Telegram</span>
+        {% elif first.get('event_type') == 'scraped.page' %}
+          <span class="badge" style="background:#f3e5f5;color:#6a1b9a;font-size:.85rem"><i class="bi bi-globe me-1"></i>Scraped</span>
+        {% elif first.get('event_type') == 'http_api.response' %}
+          <span class="badge" style="background:#e3f2fd;color:#1565c0;font-size:.85rem"><i class="bi bi-cloud me-1"></i>HTTP API</span>
+        {% else %}
+          <strong>{{ first.event_type if first.get('event_type') else '—' }}</strong>
+        {% endif %}
+      </div>
+      <div class="col-sm-3">
+        <div class="text-muted small mb-1">سورس</div>
+        <strong>{{ first.source_name if first.get('source_name') else '—' }}</strong>
+      </div>
+      <div class="col-sm-3">
+        <div class="text-muted small mb-1">اولین رویداد</div>
+        <strong>{{ first.created_at.strftime('%Y-%m-%d %H:%M:%S') if first.created_at else '—' }}</strong>
+      </div>
+      <div class="col-sm-3">
+        <div class="text-muted small mb-1">تعداد مراحل</div>
+        <strong>{{ steps|length }}</strong>
+      </div>
     </div>
-    <div>
-      <div class="text-muted small">سورس</div>
-      <strong>{{ first.source_name if first.get('source_name') else '—' }}</strong>
-    </div>
-    <div>
-      <div class="text-muted small">اولین رویداد</div>
-      <strong>{{ first.created_at.strftime('%Y-%m-%d %H:%M:%S') if first.created_at else '—' }}</strong>
-    </div>
-    <div>
-      <div class="text-muted small">تعداد مراحل</div>
-      <strong>{{ steps|length }}</strong>
+
+    <!-- Mini pipeline flow bar -->
+    {% set stage_labels = {'engine':'Engine','html-worker':'HTML','serializer':'Serialize','ai-worker':'AI','final-store':'Final'} %}
+    {% set seen_services = [] %}
+    {% for step in steps %}{% if step.service not in seen_services %}{% set _ = seen_services.append(step.service) %}{% endif %}{% endfor %}
+    <div class="mt-3 d-flex align-items-center gap-1 flex-wrap">
+      {% for svc in ['engine','html-worker','serializer','ai-worker','final-store'] %}
+        {% if svc in seen_services %}
+          {% set svc_steps = steps | selectattr('service','eq',svc) | list %}
+          {% set has_err = svc_steps | selectattr('status','eq','error') | list | length > 0 %}
+          {% set has_drop = svc_steps | selectattr('status','eq','dropped') | list | length > 0 %}
+          {% set all_done = svc_steps | selectattr('status','eq','completed') | list | length > 0 %}
+          <div class="pipeline-step-pill {% if has_err %}pill-error{% elif has_drop %}pill-drop{% elif all_done %}pill-ok{% else %}pill-progress{% endif %}">
+            <i class="bi {% if has_err %}bi-x-circle-fill{% elif has_drop %}bi-dash-circle-fill{% elif all_done %}bi-check-circle-fill{% else %}bi-clock-fill{% endif %} me-1"></i>
+            {{ stage_labels.get(svc, svc) }}
+          </div>
+          {% if not loop.last and svc != 'final-store' %}
+          <i class="bi bi-arrow-left text-muted" style="font-size:.7rem"></i>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
     </div>
   </div>
 </div>
 
-<div class="timeline">
+<!-- Timeline -->
+<div class="timeline-container">
   {% for step in steps %}
-  <div class="timeline-item
-    {% if step.status == 'completed' %}tl-completed
-    {% elif step.status == 'error' %}tl-error
-    {% elif step.status == 'dropped' %}tl-dropped
-    {% else %}tl-started{% endif %}">
+  <div class="tl-item">
+    <!-- Connector line -->
+    {% if not loop.last %}<div class="tl-line"></div>{% endif %}
 
-    <div class="timeline-dot">
-      {% if step.status == 'completed' %}
-        <i class="bi bi-check-circle-fill text-success"></i>
-      {% elif step.status == 'error' %}
-        <i class="bi bi-x-circle-fill text-danger"></i>
-      {% elif step.status == 'dropped' %}
-        <i class="bi bi-dash-circle-fill text-warning"></i>
-      {% else %}
-        <i class="bi bi-clock-fill text-secondary"></i>
-      {% endif %}
+    <!-- Dot -->
+    <div class="tl-dot
+      {% if step.status == 'completed' %}tl-dot-ok
+      {% elif step.status == 'error' %}tl-dot-err
+      {% elif step.status == 'dropped' %}tl-dot-drop
+      {% else %}tl-dot-start{% endif %}">
+      <i class="bi
+        {% if step.status == 'completed' %}bi-check-lg
+        {% elif step.status == 'error' %}bi-x-lg
+        {% elif step.status == 'dropped' %}bi-dash-lg
+        {% else %}bi-play-fill{% endif %}"></i>
     </div>
 
-    <div class="timeline-card card border-0 shadow-sm">
+    <!-- Card -->
+    <div class="tl-card card border-0 shadow-sm
+      {% if step.status == 'error' %}border-start border-danger{% elif step.status == 'dropped' %}border-start border-warning{% elif step.status == 'completed' %}border-start border-success{% endif %}"
+      style="border-width:3px!important">
       <div class="card-body py-2 px-3">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <span class="fw-semibold">{{ step.service }}</span>
-            <span class="text-muted mx-1">/</span>
-            <span class="badge bg-light text-dark border">{{ step.step }}</span>
-            <span class="ms-2
-              {% if step.status == 'completed' %}text-success
-              {% elif step.status == 'error' %}text-danger
-              {% elif step.status == 'dropped' %}text-warning
-              {% else %}text-secondary{% endif %} small fw-medium">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center gap-2">
+            <span class="fw-semibold font-monospace small">{{ step.service }}</span>
+            <span class="text-muted">/</span>
+            <span class="badge bg-light text-dark border font-monospace" style="font-size:.75rem">{{ step.step }}</span>
+            <span class="badge
+              {% if step.status == 'completed' %}bg-success-subtle text-success
+              {% elif step.status == 'error' %}bg-danger-subtle text-danger
+              {% elif step.status == 'dropped' %}bg-warning-subtle text-warning
+              {% else %}bg-secondary-subtle text-secondary{% endif %}" style="font-size:.7rem">
               {{ step.status }}
             </span>
           </div>
-          <span class="text-muted small">
-            {{ step.created_at.strftime('%H:%M:%S.') + '%03d'|format(step.created_at.microsecond // 1000) if step.created_at else '—' }}
+          <span class="text-muted" style="font-size:.72rem;font-family:monospace">
+            {{ step.created_at.strftime('%H:%M:%S') if step.created_at else '—' }}
           </span>
         </div>
 
         {% if step.error_message %}
-        <div class="mt-2 p-2 bg-danger-subtle rounded small text-danger font-monospace">
-          <i class="bi bi-exclamation-circle me-1"></i>{{ step.error_message }}
+        <div class="mt-2 p-2 rounded-2 d-flex gap-2 align-items-start" style="background:#fff5f5;border:1px solid #ffd0d0">
+          <i class="bi bi-exclamation-circle text-danger mt-1 flex-shrink-0"></i>
+          <span class="small font-monospace text-danger" style="word-break:break-word">{{ step.error_message }}</span>
         </div>
         {% endif %}
 
         {% if step.ai_signals %}
         <div class="mt-2">
-          <button class="btn btn-sm btn-outline-info py-0 px-2"
+          <button class="btn btn-sm py-0 px-2 btn-outline-info"
                   type="button" data-bs-toggle="collapse"
                   data-bs-target="#ai-{{ step.id }}">
             <i class="bi bi-robot me-1"></i>خروجی AI
+            <span class="badge bg-info-subtle text-info ms-1">{{ step.ai_signals | length }}</span>
           </button>
           <div class="collapse mt-2" id="ai-{{ step.id }}">
-            <pre class="bg-light p-2 rounded small mb-0" style="max-height:300px;overflow:auto">{{ step.ai_signals | tojson(indent=2) }}</pre>
+            <pre class="rounded-2 p-3 small mb-0" style="background:#0f1117;color:#a8ff78;max-height:300px;overflow:auto;font-size:.75rem">{{ step.ai_signals | tojson(indent=2) }}</pre>
           </div>
         </div>
         {% endif %}
       </div>
     </div>
-
   </div>
   {% endfor %}
 </div>
 
-{% else %}
-<div class="text-center text-muted py-5">
-  <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-  هیچ رویدادی برای این trace ID پیدا نشد
-</div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<style>
+.pipeline-step-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: .78rem;
+  font-weight: 600;
+}
+.pill-ok     { background:#d1fae5; color:#065f46; }
+.pill-error  { background:#fee2e2; color:#991b1b; }
+.pill-drop   { background:#fef9c3; color:#854d0e; }
+.pill-progress { background:#dbeafe; color:#1e3a8a; }
+
+.timeline-container { position: relative; padding-bottom: 1rem; }
+.tl-item { display: grid; grid-template-columns: 28px 1fr; gap: 0 14px; margin-bottom: 0; position: relative; }
+.tl-line { position: absolute; left: 13px; top: 28px; bottom: -12px; width: 2px; background: #e2e8f0; z-index: 0; }
+.tl-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; font-weight: 700;
+  z-index: 1; position: relative; flex-shrink: 0; margin-top: 4px;
+}
+.tl-dot-ok    { background:#d1fae5; color:#065f46; border: 2px solid #10b981; }
+.tl-dot-err   { background:#fee2e2; color:#991b1b; border: 2px solid #ef4444; }
+.tl-dot-drop  { background:#fef9c3; color:#854d0e; border: 2px solid #f59e0b; }
+.tl-dot-start { background:#dbeafe; color:#1e3a8a; border: 2px solid #3b82f6; }
+.tl-card { margin-bottom: 12px; }
+</style>
 {% endblock %}

@@ -18,7 +18,7 @@ def create_app():
         template_folder=os.path.join(os.path.dirname(__file__), "templates"),
         static_folder=os.path.join(os.path.dirname(__file__), "static"),
     )
-    app.secret_key = os.getenv("FLASK_SECRET_KEY", os.urandom(24).hex())
+    app.secret_key = os.getenv("FLASK_SECRET_KEY", "signal-admin-fallback-key-change-in-prod")
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -48,10 +48,7 @@ def create_app():
             stats = db.get_dashboard_stats()
         except Exception as e:
             stats = {"error": str(e)}
-        services = [
-            "engine", "html-worker", "ai-worker", "serializer",
-            "final-store", "http-api-producer", "scraper-producer", "telegram-producer",
-        ]
+        services = _ALL_SERVICES
         health = _check_health(services)
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         return render_template("dashboard.html", stats=stats, health=health, now=now)
@@ -60,9 +57,13 @@ def create_app():
     @app.route("/sources/http-api")
     @login_required
     def sources_http_api():
-        sources = db.get_http_api_sources()
-        return render_template("sources.html", http_sources=sources,
-                               scraper_sources=db.get_scraper_sources(), active_tab="http-api")
+        return render_template(
+            "sources.html",
+            http_sources=db.get_http_api_sources(),
+            scraper_sources=db.get_scraper_sources(),
+            telegram_sources=db.get_telegram_sources(),
+            active_tab="http-api",
+        )
 
     @app.route("/sources/http-api/add", methods=["POST"])
     @login_required
@@ -97,8 +98,13 @@ def create_app():
     @app.route("/sources/scraper")
     @login_required
     def sources_scraper():
-        return render_template("sources.html", http_sources=db.get_http_api_sources(),
-                               scraper_sources=db.get_scraper_sources(), active_tab="scraper")
+        return render_template(
+            "sources.html",
+            http_sources=db.get_http_api_sources(),
+            scraper_sources=db.get_scraper_sources(),
+            telegram_sources=db.get_telegram_sources(),
+            active_tab="scraper",
+        )
 
     @app.route("/sources/scraper/add", methods=["POST"])
     @login_required
@@ -128,6 +134,47 @@ def create_app():
         db.delete_scraper_source(sid)
         flash("سورس حذف شد", "warning")
         return redirect(url_for("sources_scraper"))
+
+    # ── Sources: Telegram ─────────────────────────────────────────────────────
+    @app.route("/sources/telegram")
+    @login_required
+    def sources_telegram():
+        return render_template(
+            "sources.html",
+            http_sources=db.get_http_api_sources(),
+            scraper_sources=db.get_scraper_sources(),
+            telegram_sources=db.get_telegram_sources(),
+            active_tab="telegram",
+        )
+
+    @app.route("/sources/telegram/add", methods=["POST"])
+    @login_required
+    def sources_telegram_add():
+        data = _telegram_form_data()
+        try:
+            db.add_telegram_source(data)
+            flash("کانال تلگرام اضافه شد", "success")
+        except Exception as e:
+            flash(f"خطا: {e}", "danger")
+        return redirect(url_for("sources_telegram"))
+
+    @app.route("/sources/telegram/<int:sid>/edit", methods=["POST"])
+    @login_required
+    def sources_telegram_edit(sid):
+        data = _telegram_form_data()
+        try:
+            db.update_telegram_source(sid, data)
+            flash("کانال ویرایش شد", "success")
+        except Exception as e:
+            flash(f"خطا: {e}", "danger")
+        return redirect(url_for("sources_telegram"))
+
+    @app.route("/sources/telegram/<int:sid>/delete", methods=["POST"])
+    @login_required
+    def sources_telegram_delete(sid):
+        db.delete_telegram_source(sid)
+        flash("کانال حذف شد", "warning")
+        return redirect(url_for("sources_telegram"))
 
     # ── Test Source Endpoints ─────────────────────────────────────────────────
     @app.route("/api/test/http-api", methods=["POST"])
@@ -170,8 +217,9 @@ def create_app():
     @app.route("/dlq")
     @login_required
     def dlq():
-        msgs = db.get_dlq_messages()
-        return render_template("dlq.html", messages=msgs)
+        page = int(request.args.get("page", 1))
+        result = db.get_dlq_messages(page=page, per_page=50)
+        return render_template("dlq.html", **result)
 
     @app.route("/dlq/replay/<int:log_id>", methods=["POST"])
     @login_required
@@ -195,15 +243,139 @@ def create_app():
             flash(f"خطا در replay: {e}", "danger")
         return redirect(url_for("dlq"))
 
+    @app.route("/dlq/<int:log_id>/delete", methods=["POST"])
+    @login_required
+    def dlq_delete(log_id):
+        try:
+            db.delete_pipeline_log(log_id)
+            flash("رکورد حذف شد", "warning")
+        except Exception as e:
+            flash(f"خطا: {e}", "danger")
+        return redirect(url_for("dlq"))
+
+    # ── Signals Viewer ────────────────────────────────────────────────────────
+    @app.route("/signals")
+    @login_required
+    def signals_page():
+        page = int(request.args.get("page", 1))
+        filters = {
+            "symbol": request.args.get("symbol") or None,
+            "source_type": request.args.get("source_type") or None,
+            "date_from": request.args.get("date_from") or None,
+            "date_to": request.args.get("date_to") or None,
+        }
+        try:
+            result = db.get_signals(page=page, per_page=30, **filters)
+        except Exception as e:
+            result = {"rows": [], "total": 0, "page": 1, "per_page": 30, "total_pages": 1}
+            flash(f"خطا در بارگذاری سیگنال‌ها: {e}", "danger")
+        return render_template("signals.html", **result, filters=filters)
+
+    @app.route("/signals/<int:signal_id>")
+    @login_required
+    def signal_detail(signal_id):
+        try:
+            data = db.get_signal_detail(signal_id)
+        except Exception as e:
+            flash(f"خطا: {e}", "danger")
+            return redirect(url_for("signals_page"))
+        if not data:
+            flash("سیگنال پیدا نشد", "danger")
+            return redirect(url_for("signals_page"))
+        return render_template("signal_detail.html", **data)
+
+    @app.route("/signals/<int:signal_id>/edit", methods=["POST"])
+    @login_required
+    def signal_edit(signal_id):
+        try:
+            db.update_signal(signal_id, request.form.to_dict())
+            flash("سیگنال ویرایش شد", "success")
+        except Exception as e:
+            flash(f"خطا در ویرایش: {e}", "danger")
+        return redirect(url_for("signal_detail", signal_id=signal_id))
+
+    @app.route("/signals/<int:signal_id>/delete", methods=["POST"])
+    @login_required
+    def signal_delete(signal_id):
+        try:
+            db.delete_signal(signal_id)
+            flash("سیگنال حذف شد", "warning")
+        except Exception as e:
+            flash(f"خطا در حذف: {e}", "danger")
+        return redirect(url_for("signals_page"))
+
+    @app.route("/signals/<int:signal_id>/scenarios/add", methods=["POST"])
+    @login_required
+    def scenario_add(signal_id):
+        try:
+            db.add_scenario(signal_id, request.form.to_dict())
+            flash("سناریو اضافه شد", "success")
+        except Exception as e:
+            flash(f"خطا: {e}", "danger")
+        return redirect(url_for("signal_detail", signal_id=signal_id))
+
+    @app.route("/signals/<int:signal_id>/scenarios/<int:scenario_id>/edit", methods=["POST"])
+    @login_required
+    def scenario_edit(signal_id, scenario_id):
+        try:
+            db.update_scenario(scenario_id, request.form.to_dict())
+            flash("سناریو ویرایش شد", "success")
+        except Exception as e:
+            flash(f"خطا: {e}", "danger")
+        return redirect(url_for("signal_detail", signal_id=signal_id))
+
+    @app.route("/signals/<int:signal_id>/scenarios/<int:scenario_id>/delete", methods=["POST"])
+    @login_required
+    def scenario_delete(signal_id, scenario_id):
+        try:
+            db.delete_scenario(scenario_id)
+            flash("سناریو حذف شد", "warning")
+        except Exception as e:
+            flash(f"خطا: {e}", "danger")
+        return redirect(url_for("signal_detail", signal_id=signal_id))
+
+    # ── Tracked Coins ─────────────────────────────────────────────────────────
+    @app.route("/coins")
+    @login_required
+    def coins_page():
+        page       = int(request.args.get("page", 1))
+        search     = request.args.get("search") or None
+        active_filter = request.args.get("active") or None
+        active_only = True if active_filter == "1" else (False if active_filter == "0" else None)
+        result = db.get_tracked_coins(page=page, per_page=50, search=search, active_only=active_only)
+        return render_template("coins.html", **result, search=search or "", active_filter=active_filter or "")
+
+    @app.route("/coins/<symbol>/toggle", methods=["POST"])
+    @login_required
+    def coin_toggle(symbol):
+        is_active = request.form.get("is_active") == "1"
+        db.set_coin_active(symbol, is_active)
+        return jsonify({"ok": True, "symbol": symbol, "is_active": is_active})
+
+    @app.route("/coins/bulk", methods=["POST"])
+    @login_required
+    def coins_bulk():
+        action  = request.form.get("action")
+        symbols = request.form.getlist("symbols")
+        if action == "enable":
+            db.bulk_set_coins_active(symbols, True)
+            flash(f"{len(symbols)} ارز فعال شد", "success")
+        elif action == "disable":
+            db.bulk_set_coins_active(symbols, False)
+            flash(f"{len(symbols)} ارز غیرفعال شد", "warning")
+        elif action == "enable_all":
+            db.set_all_coins_active(True)
+            flash("همه ارزها فعال شدند", "success")
+        elif action == "disable_all":
+            db.set_all_coins_active(False)
+            flash("همه ارزها غیرفعال شدند", "warning")
+        return redirect(request.referrer or url_for("coins_page"))
+
     # ── Health ────────────────────────────────────────────────────────────────
     @app.route("/health")
     @login_required
     def health_page():
-        services = [
-            "engine", "html-worker", "ai-worker", "serializer",
-            "final-store", "http-api-producer", "scraper-producer", "telegram-producer",
-        ]
-        health = _check_health(services)
+        health = _check_health(_ALL_SERVICES)
         try:
             activity = {row["service"]: row for row in db.get_worker_activity()}
         except Exception:
@@ -225,28 +397,20 @@ def create_app():
     @app.route("/workers")
     @login_required
     def workers_page():
-        services = [
-            "engine", "html-worker", "ai-worker", "serializer",
-            "final-store", "http-api-producer", "scraper-producer", "telegram-producer",
-        ]
-        health = _check_health(services)
+        health = _check_health(_ALL_SERVICES)
         try:
             activity = {row["service"]: row for row in db.get_worker_activity()}
         except Exception:
             activity = {}
-        return render_template("workers.html", health=health, activity=activity, services=services)
+        return render_template("workers.html", health=health, activity=activity, services=_ALL_SERVICES)
 
-    # ── JSON: live dashboard stats (for AJAX refresh) ─────────────────────────
+    # ── JSON APIs ─────────────────────────────────────────────────────────────
     @app.route("/api/dashboard-stats")
     @login_required
     def api_dashboard_stats():
         try:
             stats = db.get_dashboard_stats()
-            services = [
-                "engine", "html-worker", "ai-worker", "serializer",
-                "final-store", "http-api-producer", "scraper-producer", "telegram-producer",
-            ]
-            health = _check_health(services)
+            health = _check_health(_ALL_SERVICES)
             return jsonify({
                 "ok": True,
                 "total_today": stats["total_today"],
@@ -258,7 +422,49 @@ def create_app():
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)})
 
+    @app.route("/api/v1/signals")
+    @login_required
+    def api_v1_signals():
+        page     = int(request.args.get("page", 1))
+        per_page = min(int(request.args.get("per_page", 20)), 100)
+        filters  = {
+            "symbol":      request.args.get("symbol") or None,
+            "source_type": request.args.get("source_type") or None,
+            "date_from":   request.args.get("date_from") or None,
+            "date_to":     request.args.get("date_to") or None,
+        }
+        try:
+            result = db.get_signals_api(page=page, per_page=per_page, **filters)
+            return jsonify({"ok": True, **result})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.route("/api/health-status")
+    @login_required
+    def api_health_status():
+        try:
+            health = _check_health(_ALL_SERVICES)
+            activity_rows = db.get_worker_activity()
+            activity = {row["service"]: {
+                "total": row["total"],
+                "completed": row["completed"],
+                "dropped": row["dropped"],
+                "errors": row["errors"],
+                "last_activity": row["last_activity"].strftime("%H:%M:%S") if row["last_activity"] else None,
+            } for row in activity_rows}
+            return jsonify({"ok": True, "health": health, "activity": activity})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)})
+
     return app
+
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+_ALL_SERVICES = [
+    "engine", "ai-worker",
+    "final-store", "http-api-producer", "scraper-producer", "telegram-producer",
+]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -308,6 +514,15 @@ def _scraper_form_data() -> dict:
     }
 
 
+def _telegram_form_data() -> dict:
+    f = request.form
+    return {
+        "name": f.get("name"),
+        "channel": f.get("channel"),
+        "is_active": "is_active" in f,
+    }
+
+
 def _test_http_api_source(data: dict) -> dict:
     url = data.get("url", "").strip()
     if not url:
@@ -340,7 +555,6 @@ def _test_http_api_source(data: dict) -> dict:
     except Exception:
         return {"ok": False, "error": f"HTTP {status_code} OK ولی پاسخ JSON نیست (Content-Type: {resp.headers.get('Content-Type','?')})"}
 
-    # Navigate data_path
     data_path = (data.get("data_path") or "").strip()
     if data_path:
         for key in data_path.split("."):
@@ -462,17 +676,19 @@ def _test_scraper_source(data: dict) -> dict:
 
 
 def _build_replay_event(record: dict) -> dict:
-    if record.get("event_data"):
-        event = dict(record["event_data"])
-        event["trace"] = []
-        return event
+    event_type = record.get("event_type") or "unknown"
+    pipeline_map = {
+        "telegram.message": ["serialize", "ai", "final"],
+        "scraped.page":     ["html", "serialize", "ai", "final"],
+        "http_api.response": ["serialize", "ai", "final"],
+    }
     return {
         "trace_id": record["trace_id"],
-        "type": record["event_type"] or "unknown",
-        "pipeline": ["serialize", "ai", "final"],
+        "type": event_type,
+        "pipeline": pipeline_map.get(event_type, ["serialize", "ai", "final"]),
         "trace": [],
         "payload": {
-            "source": record["source_name"],
+            "source": record.get("source_name", ""),
             "text": "",
         },
     }

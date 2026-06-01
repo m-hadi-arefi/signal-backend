@@ -134,6 +134,33 @@
 
 {% block scripts %}
 <script>
-  setInterval(() => { location.reload(); }, 15000);
+setInterval(() => {
+  fetch("{{ url_for('api_health_status') }}")
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      document.querySelectorAll('tbody tr').forEach(row => {
+        const svcCell = row.querySelector('td:first-child .fw-semibold');
+        if (!svcCell) return;
+        const svc = svcCell.textContent.trim();
+        const alive = d.health[svc];
+        const badge = row.querySelector('.badge');
+        if (badge) {
+          badge.className = 'badge ' + (alive ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger');
+          badge.innerHTML = alive
+            ? '<i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>ALIVE'
+            : '<i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>DEAD';
+        }
+        const act = d.activity[svc] || {};
+        const cells = row.querySelectorAll('td');
+        if (cells[2]) cells[2].querySelector('.fw-bold').textContent = act.total || 0;
+        if (cells[3]) cells[3].querySelector('.text-success').textContent = act.completed || 0;
+        if (cells[4]) cells[4].querySelector('.text-warning').textContent = act.dropped || 0;
+        if (cells[5]) cells[5].querySelector('.text-danger').textContent = act.errors || 0;
+        if (cells[7] && act.last_activity) cells[7].textContent = act.last_activity;
+      });
+    })
+    .catch(() => {});
+}, 15000);
 </script>
 {% endblock %}

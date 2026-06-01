@@ -19,6 +19,7 @@ class SourceMetadata(BaseModel):
     type: SourceType
     provider: str
     channel: Optional[str] = None    # telegram: @cointelegraph
+    message_id: Optional[int] = None # telegram: message ID for link construction
     url: Optional[str] = None        # scraper: article URL
     external_id: Optional[str] = None  # api: provider's item ID
 

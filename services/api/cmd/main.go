@@ -1,18 +1,20 @@
-// Signal API provides a read-only REST interface for trading signals with AI analysis and scenario tracking.
+// Signal API — read-only REST interface for trading signals.
 //
-//	@title						Signal API
-//	@version					1.0
-//	@description				Read-only REST API for accessing AI-analyzed trading signals, scenario plans, and result tracking.
-//	@contact.name				Signal Team
-//	@host						localhost:8080
-//	@BasePath					/
-//	@schemes					http https
-//	@produce					json
+//	@title			Signal API
+//	@version		2.0
+//	@description	Read-only REST API for AI-analysed trading signals with scenario tracking and evaluation results.
+//	@host			localhost:8080
+//	@BasePath		/
+//	@schemes		http https
 //
-//	@tag.name					signals
-//	@tag.description			Paginated trading signal endpoints with optional filtering by symbol, source type, and provider
-//	@tag.name					system
-//	@tag.description			Service health and diagnostics
+//	@tag.name		signals
+//	@tag.description	Paginated signal endpoints with nested scenarios and evaluation results
+//	@tag.name		sources
+//	@tag.description	Source provider discovery and filtering
+//	@tag.name		coins
+//	@tag.description	Active tracked coin list
+//	@tag.name		system
+//	@tag.description	Health and diagnostics
 package main
 
 import (
@@ -42,8 +44,6 @@ import (
 )
 
 func main() {
-	// Honour container CPU quota — Go detects host CPU count (e.g. 16) not
-	// the container limit (e.g. 2), causing scheduling overhead.
 	if v := os.Getenv("GOMAXPROCS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			runtime.GOMAXPROCS(n)
@@ -74,10 +74,7 @@ func main() {
 		ReadTimeout:               cfg.ServerReadTimeout,
 		WriteTimeout:              cfg.ServerWriteTimeout,
 		IdleTimeout:               cfg.ServerIdleTimeout,
-		DisableKeepalive:          false,
 		DisableDefaultDate:        true,
-		DisableHeaderNormalizing:  false,
-		DisableDefaultContentType: false,
 		Concurrency:               256 * 1024,
 	})
 
@@ -90,60 +87,38 @@ func main() {
 		AllowMethods: "GET,HEAD,OPTIONS",
 		AllowHeaders: "Accept,Content-Type,Authorization",
 	}))
-	app.Use(compress.New(compress.Config{
-		Level: compress.LevelBestSpeed,
-	}))
-
-	// Global rate limiter — drops excess requests before they reach handlers.
+	app.Use(compress.New(compress.Config{Level: compress.LevelBestSpeed}))
 	app.Use(middleware.GlobalRateLimiter(cfg.RateLimitRPS, time.Second))
 
-	// ------------------------------------------------------------------ //
-	// Dependencies                                                         //
-	// ------------------------------------------------------------------ //
-
+	// ── Dependencies ──────────────────────────────────────────────────────────
 	healthHandler := handler.NewHealthHandler(pool, redisCache)
 	signalRepo    := repository.NewSignalRepository(pool)
 	signalHandler := handler.NewSignalHandler(signalRepo, redisCache)
+	concLimit     := middleware.ConcurrencyLimiter(cfg.MaxConcurrent)
 
-	concLimit := middleware.ConcurrencyLimiter(cfg.MaxConcurrent)
-
-	// ------------------------------------------------------------------ //
-	// Routes                                                               //
-	// ------------------------------------------------------------------ //
-
-	app.Get("/health", healthHandler.Check)
+	// ── Routes ────────────────────────────────────────────────────────────────
+	app.Get("/health",    healthHandler.Check)
 	app.Get("/swagger/*", fiberSwagger.HandlerDefault)
 
 	v1 := app.Group("/v1")
 
-	signals := v1.Group("/signals")
+	// Signals
+	// Note: static segments (/coin/) must be registered before parametric (/:id)
+	// so Fiber's radix tree routes them correctly.
+	v1.Get("/signals",                concLimit, signalHandler.List)
+	v1.Get("/signals/coin/:symbol",   concLimit, signalHandler.ListByCoin)
+	v1.Get("/signals/:id",            concLimit, signalHandler.GetByID)
 
-	// Static routes registered before parameter routes so Fiber prefers them.
-	// GET /v1/signals
-	signals.Get("/", concLimit, signalHandler.List)
+	// Sources
+	v1.Get("/sources",                         concLimit, signalHandler.ListSources)
+	v1.Get("/sources/:provider/signals",       concLimit, signalHandler.ListByProvider)
 
-	// GET /v1/signals/results  (must be before /:symbol to avoid collision)
-	signals.Get("/results", concLimit, signalHandler.ListWithResults)
+	// Coins
+	v1.Get("/coins/active", concLimit, signalHandler.ListActiveCoins)
 
-	// GET /v1/signals/source/:provider
-	signals.Get("/source/:provider", concLimit, signalHandler.ListByProvider)
-
-	// GET /v1/signals/source/:provider/results
-	signals.Get("/source/:provider/results", concLimit, signalHandler.ListByProviderWithResults)
-
-	// GET /v1/signals/:symbol
-	signals.Get("/:symbol", concLimit, signalHandler.ListBySymbol)
-
-	// GET /v1/signals/:symbol/results
-	signals.Get("/:symbol/results", concLimit, signalHandler.ListBySymbolWithResults)
-
-	// ------------------------------------------------------------------ //
-	// Graceful shutdown                                                    //
-	// ------------------------------------------------------------------ //
-
+	// ── Graceful shutdown ─────────────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-
 	go func() {
 		<-quit
 		log.Println("shutdown signal received")

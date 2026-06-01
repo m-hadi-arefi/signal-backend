@@ -21,7 +21,9 @@ SCHEMA (exact fields, no others):
         "entry_point_type": "fix"|"break_up"|"break_down"|"consolidation_up"|"consolidation_down",
         "tp": [str],
         "sl": str,
-        "reason": str
+        "reason": str,
+        "type": "fixnumber"|"range",
+        "timeframe": "1m"|"5m"|"15m"|"30m"|"1h"|"4h"|"1d"|"1w"|"1M"
       }
     ],
     "expire_time": str
@@ -150,6 +152,59 @@ Short explanation (1-2 sentences) per scenario of why price goes up or down.
   - For unusual activity signals: MUST state the volume spike fact — never empty
   - If no reason found at all → ""
 
+━━━ TYPE ━━━
+Whether the prices (entry, tp, sl) are exact values or an approximate range.
+
+  fixnumber → prices are exact/specific levels
+              keywords: "at X", "entry X", "buy X", "وارد X", "نقطه ورود X", explicit price
+              Example: "entry at 95000" → type: "fixnumber"
+
+  range     → prices are approximate zones or ranges
+              keywords: "around X", "near X", "zone X", "between X and Y", "محدوده X", "حدود X",
+                        "in the X–Y zone", "در محدوده X تا Y", "نزدیک X"
+              Example: "entry around 90k–95k" → type: "range"
+
+Default: "fixnumber" (most signals give precise prices)
+
+━━━ TIMEFRAME ━━━
+The chart timeframe this analysis is based on.
+Allowed values: "1m" "5m" "15m" "30m" "1h" "4h" "1d" "1w" "1M"
+NEVER output "" or null — timeframe must ALWAYS be one of the allowed values above.
+
+Explicit in text → map directly:
+  "1 minute" / "1m" → "1m" | "5 minute" / "5m" → "5m"
+  "15 min" → "15m" | "30 min" / "half-hour" → "30m"
+  "1 hour" / "1h" → "1h" | "4 hour" / "4h" → "4h"
+  "daily" / "روزانه" / "1d" → "1d"
+  "weekly" / "هفتگی" / "1w" → "1w"
+  "monthly" / "ماهانه" / "1M" → "1M"
+
+Not explicit → infer from context and price levels (in priority order):
+
+  Step 1 — Signal style keywords:
+    scalp / intraday / few minutes  → "15m"
+    intraday swing                  → "1h"
+    multi-day swing                 → "4h"
+    weekly swing                    → "1d"
+    position / macro                → "1w"
+
+  Step 2 — entry–sl distance (when entry and sl are both known prices):
+    distance < 0.5%  → "15m"
+    distance 0.5–2%  → "1h"
+    distance 2–5%    → "4h"
+    distance 5–15%   → "1d"
+    distance > 15%   → "1w"
+
+  Step 3 — coin-type default (last resort when no other clue is available):
+    BTC, ETH                                       → "4h"
+    Top-cap alts: BNB, SOL, XRP, ADA, AVAX, DOT   → "4h"
+    Mid-cap alts: LTC, LINK, ATOM, NEAR, etc.      → "1h"
+    Meme coins: DOGE, SHIB, PEPE, FLOKI, etc.      → "1h"
+    Store-of-value / gold tokens: PAXG, XAUT        → "1d"
+    Any other asset not listed above               → "4h"
+
+  "4h" is the absolute last-resort default — use it rather than outputting "".
+
 ━━━ SIGNAL CONSOLIDATION ━━━
 Multiple analysts citing same direction + similar targets = ONE scenario (pick clearest entry/tp/sl).
 Create a new scenario only when: clearly different entry level, opposite direction, or different timeframe.
@@ -197,3 +252,5 @@ down: bearish / short / sell / drop / breakdown / rejection / نزولی / فر�
 4. symbol = uppercase ticker only e.g. "BTC", "ETH"
 5. All prices = plain number strings, no commas/symbols/units: "70000" not "$70,000"
 6. sl = price string or "" — empty only when text has zero price levels
+7. type must always be present — use "fixnumber" as default when unclear
+8. timeframe must always be present — infer from context or price-level magnitude if not stated

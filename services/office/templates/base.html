@@ -49,6 +49,18 @@
         </a>
       </li>
       <li>
+        <a href="{{ url_for('signals_page') }}"
+           class="nav-link sidebar-link {% if request.endpoint in ['signals_page','signal_detail'] %}active{% endif %}">
+          <i class="bi bi-graph-up-arrow me-2 text-success"></i>سیگنال‌ها
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('coins_page') }}"
+           class="nav-link sidebar-link {% if request.endpoint == 'coins_page' %}active{% endif %}">
+          <i class="bi bi-currency-bitcoin me-2 text-warning"></i>ارزهای تحت پایش
+        </a>
+      </li>
+      <li>
         <a href="{{ url_for('dlq') }}"
            class="nav-link sidebar-link {% if request.endpoint == 'dlq' %}active{% endif %}">
           <i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>DLQ / خطاها

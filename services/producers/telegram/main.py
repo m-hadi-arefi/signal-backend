@@ -4,6 +4,7 @@ from telethon import TelegramClient, events
 
 from core.kafka_client import get_producer
 from core.trace import ensure_trace
+from core.text import clean_text
 from shared.enums.workflows import WORKFLOWS
 
 from services.producers.telegram.client import client, PHONE
@@ -22,20 +23,23 @@ async def handle_message(event, producer):
             f"@{chat.username}" if getattr(chat, "username", None) else channel_id
         )
 
+        raw_text = message.message or ""
         event_data = ensure_trace({
             "type": "telegram.message",
             "pipeline": WORKFLOWS["telegram_pipeline"],
 
             # Source metadata — required by FinalEventSchema
             "source": {
-                "type":     "telegram",
-                "provider": "telegram",
-                "channel":  channel_handle,
+                "type":       "telegram",
+                "provider":   "telegram",
+                "channel":    channel_handle,
+                "message_id": message.id,
             },
 
             "payload": {
                 "message_id": message.id,
-                "text":       message.message,
+                "real_text":  raw_text,
+                "text":       clean_text(raw_text),
                 "chat_id":    event.chat_id,
                 "sender_id":  message.sender_id,
                 "date":       str(message.date),

@@ -20,10 +20,10 @@
 
 1. Start the project
 ```bash
-docker compose -f docker-compose.yml -f docker/kafka-compose.yml -f docker/workers-compose.yml -f docker/producers-compose.yml -f docker/api-compose.yml up -d
+docker compose -f docker-compose.yml -f docker/kafka-compose.yml -f docker/workers-compose.yml -f docker/producers-compose.yml -f docker/api-compose.yml -f docker/claude-compose.yml -f docker/processors-compose.yml -f docker/office-compose.yml up -d
 ```
 
 2. Stop the project
 ```bash
-docker compose -f docker-compose.yml -f docker/kafka-compose.yml -f docker/workers-compose.yml -f docker/producers-compose.yml -f docker/api-compose.yml down
+docker compose -f docker-compose.yml -f docker/kafka-compose.yml -f docker/workers-compose.yml -f docker/producers-compose.yml -f docker/api-compose.yml -f docker/claude-compose.yml -f docker/processors-compose.yml -f docker/office-compose.yml down
 ```

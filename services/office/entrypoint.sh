@@ -31,9 +31,6 @@ while True:
 print("DB is ready")
 PYEOF
 
-echo "Waiting for Kafka..."
-python core/bootstrap.py
-
 echo "Running migrations..."
 alembic upgrade head
 

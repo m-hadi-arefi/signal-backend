@@ -4,9 +4,7 @@ from core.config import settings
 
 TOPICS = [
     "engine-events",
-    "html-events",
     "ai-events",
-    "serialize-events",
     "final-events",
     "dlq-events"
 ]

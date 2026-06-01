@@ -21,7 +21,7 @@
         </div>
         <div>
           <div class="text-muted small">کل پیام‌های امروز</div>
-          <div class="fs-3 fw-bold">{{ stats.total_today }}</div>
+          <div class="fs-3 fw-bold" id="total-today">{{ stats.total_today }}</div>
         </div>
       </div>
     </div>
@@ -173,13 +173,14 @@ function refreshStats() {
     .then(r => r.json())
     .then(d => {
       if (!d.ok) return;
-      document.getElementById('total-today') && (document.getElementById('total-today').textContent = d.total_today);
-      document.getElementById('last-hour') && (document.getElementById('last-hour').textContent = d.last_hour);
-      const rate = d.success_rate;
+      const totalEl = document.getElementById('total-today');
+      if (totalEl) totalEl.textContent = d.total_today;
+      const hourEl = document.getElementById('last-hour');
+      if (hourEl) hourEl.textContent = d.last_hour;
       const bar = document.getElementById('success-bar');
       const rateEl = document.getElementById('success-rate');
-      if (bar) bar.style.width = rate + '%';
-      if (rateEl) rateEl.textContent = rate + '%';
+      if (bar) bar.style.width = d.success_rate + '%';
+      if (rateEl) rateEl.textContent = d.success_rate + '%';
       const ts = new Date().toLocaleTimeString('fa-IR');
       const el = document.getElementById('refresh-time');
       if (el) el.textContent = '| بروز: ' + ts;
@@ -187,9 +188,5 @@ function refreshStats() {
     .catch(() => {});
 }
 setInterval(refreshStats, 30000);
-document.addEventListener('DOMContentLoaded', () => {
-  const el = document.querySelector('.fs-3.fw-bold');
-  if (el) el.id = 'total-today';
-});
 </script>
 {% endblock %}

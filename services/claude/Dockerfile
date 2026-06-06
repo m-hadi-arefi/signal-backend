@@ -21,8 +21,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Claude CLI globally
-RUN npm install -g @anthropic-ai/claude-code
+# Install Claude CLI globally — pin version to avoid silent breaking changes
+RUN npm install -g @anthropic-ai/claude-code@2.1.160
 
 WORKDIR /app
 

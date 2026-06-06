@@ -45,8 +45,11 @@ watchfiles==1.1.1
 # OpenAI
 openai==2.36.0
 
-# http 
+# http
 aiohttp==3.13.5
+
+# WebSocket (price_streamer)
+websockets==13.1
 
 # fuzzy
 RapidFuzz==3.14.5

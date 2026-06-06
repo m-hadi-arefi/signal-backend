@@ -7,6 +7,7 @@ Create Date: 2026-05-31 00:00:00.000000
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect as sa_inspect
 
 revision: str = "a1b2c3d4e5f6"
 down_revision: Union[str, Sequence[str], None] = "f4a5b6c7d8e9"
@@ -331,18 +332,21 @@ _COINS = [
 
 
 def upgrade() -> None:
-    op.create_table(
-        "tracked_coins",
-        sa.Column("id",        sa.Integer(),      nullable=False),
-        sa.Column("symbol",    sa.String(20),     nullable=False),
-        sa.Column("name",      sa.String(255),    nullable=False, server_default=""),
-        sa.Column("fa_name",   sa.String(255),    nullable=False, server_default=""),
-        sa.Column("is_active", sa.Boolean(),      nullable=False, server_default=sa.text("TRUE")),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("symbol"),
-    )
-    op.create_index("ix_tracked_coins_symbol",    "tracked_coins", ["symbol"])
-    op.create_index("ix_tracked_coins_is_active", "tracked_coins", ["is_active"])
+    existing = set(sa_inspect(op.get_bind()).get_table_names())
+
+    if "tracked_coins" not in existing:
+        op.create_table(
+            "tracked_coins",
+            sa.Column("id",        sa.Integer(),      nullable=False),
+            sa.Column("symbol",    sa.String(20),     nullable=False),
+            sa.Column("name",      sa.String(255),    nullable=False, server_default=""),
+            sa.Column("fa_name",   sa.String(255),    nullable=False, server_default=""),
+            sa.Column("is_active", sa.Boolean(),      nullable=False, server_default=sa.text("TRUE")),
+            sa.PrimaryKeyConstraint("id"),
+            sa.UniqueConstraint("symbol"),
+        )
+        op.create_index("ix_tracked_coins_symbol",    "tracked_coins", ["symbol"])
+        op.create_index("ix_tracked_coins_is_active", "tracked_coins", ["is_active"])
 
     conn = op.get_bind()
     conn.execute(

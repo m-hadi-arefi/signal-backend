@@ -1,11 +1,5 @@
 """add unique constraint + entered_at column to scenario_results
 
-Adds:
-  - entered_at (DateTime, nullable): timestamp when the scenario's entry
-    condition was first confirmed. NULL means "waiting for entry".
-  - UNIQUE(scenario_id): enables efficient ON CONFLICT upsert so the
-    evaluator can write a fresh snapshot every 60 seconds.
-
 Revision ID: b2c3d4e5f6a7
 Revises: a1b2c3d4e5f6
 Create Date: 2026-05-31 00:00:00.000000
@@ -21,13 +15,13 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "scenario_results",
-        sa.Column("entered_at", sa.DateTime(), nullable=True),
-    )
+    # ADD COLUMN IF NOT EXISTS — safe to re-run
+    op.execute("""
+        ALTER TABLE scenario_results
+        ADD COLUMN IF NOT EXISTS entered_at TIMESTAMP
+    """)
 
-    # Remove duplicates before adding unique constraint.
-    # Keep the most recent row per scenario (by evaluated_at, then id).
+    # Remove duplicate rows before adding unique constraint (keeps latest per scenario)
     op.execute("""
         DELETE FROM scenario_results
         WHERE id NOT IN (
@@ -37,11 +31,19 @@ def upgrade() -> None:
         )
     """)
 
-    op.create_unique_constraint(
-        "uq_scenario_results_scenario_id",
-        "scenario_results",
-        ["scenario_id"],
-    )
+    # Add unique constraint only if it doesn't already exist
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'uq_scenario_results_scenario_id'
+            ) THEN
+                ALTER TABLE scenario_results
+                ADD CONSTRAINT uq_scenario_results_scenario_id UNIQUE (scenario_id);
+            END IF;
+        END$$
+    """)
 
 
 def downgrade() -> None:

@@ -92,8 +92,8 @@ func main() {
 
 	// ── Dependencies ──────────────────────────────────────────────────────────
 	healthHandler := handler.NewHealthHandler(pool, redisCache)
-	signalRepo    := repository.NewSignalRepository(pool)
-	signalHandler := handler.NewSignalHandler(signalRepo, redisCache)
+	signalRepo    := repository.NewSignalRepository(pool, redisCache) // cache used only for live prices
+	signalHandler := handler.NewSignalHandler(signalRepo)
 	concLimit     := middleware.ConcurrencyLimiter(cfg.MaxConcurrent)
 
 	// ── Routes ────────────────────────────────────────────────────────────────

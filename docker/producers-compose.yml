@@ -27,6 +27,9 @@ services:
       dockerfile: Dockerfile
     command: watchfiles 'python services/producers/scraper/main.py'
     restart: always
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
     depends_on:
       kafka:

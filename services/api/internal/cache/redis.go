@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -100,6 +102,22 @@ func (c *Cache) Del(ctx context.Context, keys ...string) error {
 // Ping checks the Redis connection.
 func (c *Cache) Ping(ctx context.Context) error {
 	return c.client.Ping(ctx).Err()
+}
+
+// GetPrice reads the live market price for a symbol from the price-fetcher's Redis keys.
+// Key format used by the Python price_fetcher: {symbol_lower}usdt  (e.g. "btcusdt").
+// Returns nil when the key is missing or the value cannot be parsed.
+func (c *Cache) GetPrice(ctx context.Context, symbol string) *float64 {
+	key := strings.ToLower(symbol) + "usdt"
+	val, err := c.client.Get(ctx, key).Result()
+	if err != nil {
+		return nil
+	}
+	f, err := strconv.ParseFloat(val, 64)
+	if err != nil || f == 0 {
+		return nil
+	}
+	return &f
 }
 
 // Close releases the Redis connection pool.

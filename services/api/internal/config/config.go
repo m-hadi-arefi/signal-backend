@@ -47,7 +47,7 @@ func Load() *Config {
 		RedisAddr:     getEnv("REDIS_ADDR", "redis:6379"),
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 		RedisDB:       getEnvInt("REDIS_DB", 0),
-		CacheTTL:      getEnvDuration("CACHE_TTL", 30*time.Second),
+		CacheTTL:      getEnvDuration("CACHE_TTL", 3*time.Second),
 
 		MaxConcurrent: getEnvInt("MAX_CONCURRENT", 300),
 		RateLimitRPS:  getEnvInt("RATE_LIMIT_RPS", 5000),

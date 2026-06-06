@@ -134,44 +134,125 @@ const docTemplate = `{
     "Signal": {
       "type": "object",
       "properties": {
-        "id":                   {"type": "integer"},
-        "symbol":               {"type": "string",  "example": "BTC"},
-        "trace_id":             {"type": "string"},
-        "source":               {"type": "object",  "description": "{type, provider, channel?, url?, external_id?}"},
-        "ai_summary":           {"type": "string"},
-        "current_market_price": {"type": "object",  "description": "{price, source, timestamp}"},
-        "created_at":           {"type": "string",  "format": "date-time"},
-        "analyzed_at":          {"type": "string",  "format": "date-time"},
-        "scenarios":            {"type": "array",   "items": {"$ref": "#/definitions/Scenario"}}
+        "id":            {"type": "integer"},
+        "symbol":        {"type": "string",  "example": "BTC"},
+        "trace_id":      {"type": "string"},
+        "source":        {"type": "object",  "description": "{type, provider, channel?, url?, external_id?}"},
+        "ai_summary":    {"type": "string"},
+        "created_at":    {"type": "string",  "format": "date-time"},
+        "analyzed_at":   {"type": "string",  "format": "date-time"},
+        "active":        {"type": "boolean", "description": "true when any scenario has status=active"},
+        "current_price": {"type": "number",  "description": "live market price from Redis"},
+        "created_price": {"type": "number",  "description": "market price snapshotted at signal creation"},
+        "scenarios":     {"type": "array",   "items": {"$ref": "#/definitions/Scenario"}}
       }
     },
     "Scenario": {
       "type": "object",
       "properties": {
         "id":           {"type": "integer"},
-        "direction":    {"type": "string",  "enum": ["long","short","neutral","conditional"]},
+        "direction":    {"type": "string",  "enum": ["long","short","neutral"]},
         "entry_point":  {"type": "number"},
-        "entry_type":   {"type": "string",  "enum": ["market","limit","breakout","fix","break_up","break_down"]},
+        "entry_type":   {"type": "string",  "enum": ["market","fix","break_up","break_down","consolidation_up","consolidation_down"]},
         "take_profits": {"type": "array",   "items": {"type": "object", "properties": {"price": {"type": "number"}, "label": {"type": "string"}}}},
         "stop_loss":    {"type": "number"},
         "confidence":   {"type": "number",  "minimum": 0, "maximum": 1},
         "reasoning":    {"type": "string"},
-        "status":       {"type": "string",  "enum": ["running","active","success","failed","expired"]},
-        "is_entered":   {"type": "boolean", "description": "true when entry condition has been confirmed"},
+        "status":       {"type": "string",  "enum": ["running","active","success","failed","expired","cancelled","invalid","rejected","skipped"]},
+        "active":       {"type": "boolean", "description": "true when status=active"},
         "expires_at":   {"type": "string",  "format": "date-time"},
-        "result":       {"$ref": "#/definitions/ScenarioResult"}
+        "result":       {"$ref": "#/definitions/ScenarioResult"},
+        "performance":  {"$ref": "#/definitions/ScenarioPerformance"}
       }
     },
     "ScenarioResult": {
       "type": "object",
       "properties": {
-        "result":       {"type": "string",  "enum": ["running","success","failed","expired"]},
-        "pnl_percent":  {"type": "number"},
-        "hit_tp":       {"type": "number"},
-        "hit_sl":       {"type": "number"},
-        "max_drawdown": {"type": "number"},
-        "entered_at":   {"type": "string",  "format": "date-time"},
-        "evaluated_at": {"type": "string",  "format": "date-time"}
+        "result":        {"type": "string",  "enum": ["running","success","failed","expired","cancelled"]},
+        "pnl_percent":   {"type": "number",  "description": "live unrealized or final P&L %"},
+        "hit_tp":        {"type": "number",  "description": "best TP price touched"},
+        "hit_tp_index":  {"type": "integer", "description": "ordinal of best TP hit: 1=TP1, 2=TP2 …"},
+        "hit_sl":        {"type": "number"},
+        "max_drawdown":  {"type": "number",  "description": "worst PnL % seen (negative = loss)"},
+        "max_favorable": {"type": "number",  "description": "best PnL % ever seen (positive = profit)"},
+        "entry_price":   {"type": "number",  "description": "confirmed entry price (limit/market)"},
+        "exit_price":    {"type": "number",  "description": "price at which position closed (TP, SL, or expiry)"},
+        "entered_at":    {"type": "string",  "format": "date-time"},
+        "completed_at":  {"type": "string",  "format": "date-time"},
+        "evaluated_at":  {"type": "string",  "format": "date-time"},
+        "price_history": {"type": "array",   "description": "one snapshot per timeframe unit",
+                          "items": {"type": "object", "properties": {"ts": {"type": "string"}, "price": {"type": "number"}}}}
+      }
+    },
+    "ScenarioPerformance": {
+      "type": "object",
+      "description": "Fully-computed performance view. Frontend needs zero additional calculations.",
+      "properties": {
+        "activation_time":                    {"type": "string",  "format": "date-time", "description": "When position was entered"},
+        "activation_price":                   {"type": "number",  "description": "Confirmed entry price"},
+        "current_price":                      {"type": "number",  "description": "Live market price from Redis"},
+        "last_price_update_at":               {"type": "string",  "format": "date-time"},
+        "signal_age_seconds":                 {"type": "number"},
+        "signal_age_minutes":                 {"type": "number"},
+        "signal_age_hours":                   {"type": "number"},
+        "signal_age_days":                    {"type": "number"},
+        "current_pnl_percent":               {"type": "number",  "description": "Live PnL % (re-calculated from current price when active)"},
+        "current_pnl_value":                 {"type": "number",  "description": "Dollar change per unit (entry_price * pnl%)"},
+        "is_profit":                          {"type": "boolean"},
+        "is_loss":                            {"type": "boolean"},
+        "highest_price_reached":             {"type": "number"},
+        "lowest_price_reached":              {"type": "number"},
+        "max_profit_percent":                {"type": "number",  "description": "Best PnL % ever observed"},
+        "max_drawdown_percent":              {"type": "number",  "description": "Worst PnL % ever observed (negative)"},
+        "current_distance_from_entry_percent":{"type": "number", "description": "Signed distance from entry: + = favourable"},
+        "target_1_hit":                      {"type": "boolean"},
+        "target_1_hit_at":                   {"type": "string",  "format": "date-time"},
+        "target_2_hit":                      {"type": "boolean"},
+        "target_2_hit_at":                   {"type": "string",  "format": "date-time"},
+        "target_3_hit":                      {"type": "boolean"},
+        "target_3_hit_at":                   {"type": "string",  "format": "date-time"},
+        "stop_loss_hit":                     {"type": "boolean"},
+        "stop_loss_hit_at":                  {"type": "string",  "format": "date-time"},
+        "is_active":                         {"type": "boolean"},
+        "is_closed":                         {"type": "boolean"},
+        "is_expired":                        {"type": "boolean"},
+        "current_status":                    {"type": "string"},
+        "targets_completed_count":           {"type": "integer"},
+        "total_targets_count":               {"type": "integer"},
+        "success_progress_percent":          {"type": "number",  "description": "0–100"},
+        "price_history": {
+          "type": "array",
+          "description": "Price snapshots enriched with PnL",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp":   {"type": "string", "format": "date-time"},
+              "price":       {"type": "number"},
+              "pnl_percent": {"type": "number"}
+            }
+          }
+        },
+        "event_history": {
+          "type": "array",
+          "description": "Full audit timeline of state changes",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp":   {"type": "string", "format": "date-time"},
+              "event_type":  {"type": "string"},
+              "description": {"type": "string"},
+              "price":       {"type": "number"},
+              "pnl_percent": {"type": "number"}
+            }
+          }
+        },
+        "total_price_updates":  {"type": "integer"},
+        "first_seen_price":     {"type": "number"},
+        "latest_price":         {"type": "number"},
+        "best_recorded_price":  {"type": "number", "description": "Direction-aware best absolute price level"},
+        "worst_recorded_price": {"type": "number", "description": "Direction-aware worst absolute price level"},
+        "best_recorded_pnl":    {"type": "number"},
+        "worst_recorded_pnl":   {"type": "number"}
       }
     },
     "ActiveCoin": {

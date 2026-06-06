@@ -162,19 +162,29 @@ class AIWorker(BaseWorker):
         return "\n\n" + "\n".join(lines)
 
     def _call_ai_parser(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        Call the Claude gateway. Returns the parsed JSON on success.
+        Raises RuntimeError on network/HTTP errors so BaseWorker routes the
+        event to the DLQ instead of silently dropping it.
+        """
         url = os.getenv("AI_PARSER_URL", "http://claude-gateway:8000/parse")
         try:
             response = requests.post(
                 url,
                 json={"prompt": text},
                 headers={"Content-Type": "application/json"},
-                timeout=60
+                timeout=60,
             )
             response.raise_for_status()
             return response.json()
+        except requests.exceptions.Timeout:
+            raise RuntimeError(f"AI parser timeout after 60s (url={url})")
+        except requests.exceptions.ConnectionError as e:
+            raise RuntimeError(f"AI parser unreachable: {e}")
+        except requests.exceptions.HTTPError as e:
+            raise RuntimeError(f"AI parser HTTP error: {e}")
         except Exception as e:
-            print(f"AI Parser error: {e}")
-            return None
+            raise RuntimeError(f"AI parser unexpected error: {e}")
 
 
 async def run():

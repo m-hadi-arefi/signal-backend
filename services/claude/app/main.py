@@ -9,7 +9,7 @@ from typing import Any, List, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ def _infer_timeframe(symbol: str, entry: str, sl: str) -> str:
 class Scenario(BaseModel):
     model_config = ConfigDict(extra="ignore")
     direction:        str
-    entry_point:      str = "now"
+    entry_point:      Optional[str] = None
     entry_point_type: str = "fix"
     tp:               List[str] = []
     sl:               str       = ""
@@ -124,7 +124,18 @@ class Scenario(BaseModel):
     @field_validator("entry_point", mode="before")
     @classmethod
     def _v_entry(cls, v):
-        return "now" if v is None else str(v).strip()
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        if s.lower() == "now":
+            return "now"
+        try:
+            float(s.replace(",", ""))
+            return s
+        except ValueError:
+            return None
 
     @field_validator("type", mode="before")
     @classmethod
@@ -155,11 +166,23 @@ class SignalItem(BaseModel):
             return []
         return v
 
+    @model_validator(mode="after")
+    def _filter_no_entry(self) -> "SignalItem":
+        valid = [s for s in self.senarios if s.entry_point is not None]
+        discarded = len(self.senarios) - len(valid)
+        if discarded:
+            log.warning(
+                "SignalItem[%s]: dropped %d scenario(s) with no entry_point",
+                self.symbol, discarded,
+            )
+        self.senarios = valid
+        return self
+
     def model_post_init(self, __context: Any) -> None:
         """Fill in missing timeframes using sl/entry distance or coin defaults."""
         for s in self.senarios:
             if not s.timeframe:
-                s.timeframe = _infer_timeframe(self.symbol, s.entry_point, s.sl)
+                s.timeframe = _infer_timeframe(self.symbol, s.entry_point or "", s.sl)
 
 
 # ─── JSON extraction ──────────────────────────────────────────────────────────
@@ -210,21 +233,24 @@ async def call_claude(prompt: str, req_id: str) -> str:
         t0 = time.monotonic()
         log.info("[%s] claude start — concurrent=%d/%d", req_id, slots_used, MAX_CONCURRENT)
 
-        # Prefix with /parse-signal to trigger the skill, then send the actual prompt.
-        # CLI reads from stdin; exits when stdin closes (EOF).
+        # Pass the prompt as a CLI argument (not stdin).
+        # Newer Claude Code CLI versions do NOT read from a stdin pipe in --print
+        # mode — the process would block forever waiting for a TTY, causing 504.
+        # Passing as a positional arg is the supported headless/CI pattern.
         full_input = f"/parse-signal {prompt}"
         proc = await asyncio.create_subprocess_exec(
             "claude",
             "--print",
             "--output-format", "text",
-            stdin=asyncio.subprocess.PIPE,
+            full_input,                       # prompt as positional argument
+            stdin=asyncio.subprocess.DEVNULL, # no stdin — avoids hang
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
 
         try:
             stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=full_input.encode("utf-8")), timeout=CLAUDE_TIMEOUT
+                proc.communicate(), timeout=CLAUDE_TIMEOUT  # no input= needed
             )
         except asyncio.TimeoutError:
             proc.kill()
@@ -263,8 +289,10 @@ async def parse(req: ParseRequest, request: Request):
     except TimeoutError:
         raise HTTPException(status_code=504, detail="Claude CLI timed out")
     except FileNotFoundError:
+        log.error("[%s] claude CLI not found in PATH", req_id)
         raise HTTPException(status_code=500, detail="claude CLI not found — is it installed?")
     except RuntimeError as exc:
+        log.error("[%s] RuntimeError: %s", req_id, str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
 
     try:
@@ -277,13 +305,24 @@ async def parse(req: ParseRequest, request: Request):
         return JSONResponse(content={"result": "nok"})
 
     try:
-        signals = [SignalItem(**item).model_dump() for item in data]
+        parsed = [SignalItem(**item) for item in data]
     except Exception as exc:
         raise HTTPException(
             status_code=422,
             detail=f"Schema validation failed: {exc} — raw: {json.dumps(data)[:300]}",
         )
 
+    # Drop signal items that have no valid scenarios after entry_point filtering
+    valid_items = [item for item in parsed if item.senarios]
+    dropped = len(parsed) - len(valid_items)
+    if dropped:
+        log.warning("[%s] dropped %d signal item(s) with no valid scenarios (missing entry_point)", req_id, dropped)
+
+    if not valid_items:
+        log.info("[%s] result=nok — all scenarios dropped (no entry_point)", req_id)
+        return JSONResponse(content={"result": "nok"})
+
+    signals = [item.model_dump() for item in valid_items]
     log.info("[%s] result=ok signals=%d", req_id, len(signals))
     return JSONResponse(content=signals)
 
@@ -291,9 +330,33 @@ async def parse(req: ParseRequest, request: Request):
 @app.get("/health")
 async def health():
     slots_free = _sem._value
+
+    # Quick claude CLI smoke-test — tells us if the binary exists and is callable
+    claude_info: dict = {}
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "claude", "--version",
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await asyncio.wait_for(proc.communicate(), timeout=10)
+        claude_info = {
+            "ok":      proc.returncode == 0,
+            "version": (out.decode().strip() or err.decode().strip())[:120],
+            "exit":    proc.returncode,
+        }
+    except FileNotFoundError:
+        claude_info = {"ok": False, "version": "NOT FOUND in PATH", "exit": -1}
+    except asyncio.TimeoutError:
+        claude_info = {"ok": False, "version": "version check timed out", "exit": -1}
+    except Exception as exc:
+        claude_info = {"ok": False, "version": str(exc)[:120], "exit": -1}
+
     return {
         "status":     "ok",
         "capacity":   MAX_CONCURRENT,
         "slots_free": slots_free,
         "slots_busy": MAX_CONCURRENT - slots_free,
+        "claude_cli": claude_info,
     }

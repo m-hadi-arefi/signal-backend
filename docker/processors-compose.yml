@@ -1,9 +1,9 @@
 services:
-  price-fetcher:
+  price-streamer:
     build:
       context: .
       dockerfile: Dockerfile
-    command:  watchfiles 'python services/processors/price_fetcher/main.py'
+    command: watchfiles 'python services/processors/price_streamer/main.py'
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/worker_ready"]
       interval: 5s
@@ -11,11 +11,9 @@ services:
       retries: 20
     restart: unless-stopped
     depends_on:
-      kafka:
+      postgres:
         condition: service_healthy
       redis:
-        condition: service_started
-      postgres:
         condition: service_started
     networks:
       - event-net
@@ -25,12 +23,13 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - PYTHONPATH=/app
-  
+      - SKIP_KAFKA=true   # price-streamer reads from exchange WS, not Kafka
+
   signal-evaluator:
     build:
       context: .
       dockerfile: Dockerfile
-    command:  watchfiles 'python services/processors/signal_evaluator/main.py'
+    command: watchfiles 'python services/processors/signal_evaluator/main.py'
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/worker_ready"]
       interval: 5s
@@ -38,11 +37,9 @@ services:
       retries: 20
     restart: unless-stopped
     depends_on:
-      kafka:
+      postgres:
         condition: service_healthy
       redis:
-        condition: service_started
-      postgres:
         condition: service_started
     networks:
       - event-net
@@ -52,6 +49,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - PYTHONPATH=/app
+      - SKIP_KAFKA=true   # evaluator reads directly from DB + Redis, not Kafka
 
 networks:
   event-net:

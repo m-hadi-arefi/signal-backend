@@ -1,3 +1,5 @@
+import asyncio
+
 import requests
 
 HEADERS = {
@@ -15,3 +17,7 @@ def fetch(url: str, timeout: int = 15) -> str:
     response = requests.get(url, timeout=timeout, headers=HEADERS)
     response.raise_for_status()
     return response.text
+
+
+async def fetch_async(url: str, timeout: int = 15) -> str:
+    return await asyncio.to_thread(fetch, url, timeout)

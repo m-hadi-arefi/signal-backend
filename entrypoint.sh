@@ -31,11 +31,20 @@ while True:
 print("DB is ready")
 PYEOF
 
-echo "Waiting for Kafka..."
-python core/bootstrap.py
-
+# Run migrations RIGHT AFTER Postgres is ready — before Kafka wait.
+# This ensures DB schema is always up-to-date even if Kafka is down or
+# the service doesn't use Kafka at all (e.g. price-streamer, signal-evaluator).
+# Alembic uses a distributed advisory lock so concurrent service startups are safe.
 echo "Running migrations..."
 alembic upgrade head
+
+# Only wait for Kafka if this service actually needs it.
+# Set SKIP_KAFKA=true in docker-compose for services that don't use Kafka
+# (processors like price_streamer and signal_evaluator).
+if [ "${SKIP_KAFKA:-false}" != "true" ]; then
+    echo "Waiting for Kafka..."
+    python core/bootstrap.py
+fi
 
 echo "Starting app..."
 exec "$@"

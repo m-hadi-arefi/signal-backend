@@ -1,10 +1,10 @@
 import asyncio
 
-from core.kafka_client import get_producer
+from core.kafka_client import get_producer, KafkaProducerSingleton
 from core.trace import ensure_trace
 from core.text import clean_text
 from services.producers.scraper.detector import extract_post_links
-from services.producers.scraper.fetcher import fetch
+from services.producers.scraper.fetcher import fetch_async
 from services.producers.scraper.parser import parse_content
 from services.producers.scraper.rss_reader import fetch_rss_entries
 from services.producers.scraper.tracker import SeenTracker
@@ -19,13 +19,13 @@ async def process_source(source: dict, producer, tracker: SeenTracker):
 
     try:
         if "rss" in source:
-            entries = fetch_rss_entries(source)
+            entries = await fetch_rss_entries(source)
             items = [
                 {"url": e["url"], "title": e["title"], "text": e.get("text", "")}
                 for e in entries if e.get("url")
             ]
         else:
-            html  = fetch(source["listing_url"])
+            html  = await fetch_async(source["listing_url"])
             items = [{"url": u, "title": "", "text": ""} for u in extract_post_links(html, source)]
 
         if not items:
@@ -52,7 +52,7 @@ async def process_source(source: dict, producer, tracker: SeenTracker):
                     if not content["title"]:
                         content["title"] = item["title"]
                 else:
-                    post_html = fetch(url)
+                    post_html = await fetch_async(url)
                     content   = parse_content(post_html)
 
                 raw_text = content["text"]
@@ -109,6 +109,8 @@ async def run():
             await asyncio.sleep(SCRAPE_INTERVAL)
     except asyncio.CancelledError:
         print("[SCRAPER] shutting down")
+    finally:
+        await KafkaProducerSingleton.close()
 
 
 if __name__ == "__main__":

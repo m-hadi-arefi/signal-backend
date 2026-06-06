@@ -9,7 +9,8 @@ from shared.enums.workflows import WORKFLOWS
 
 from services.producers.telegram.client import client, PHONE
 
-KAFKA_TOPIC = "engine-events"
+KAFKA_TOPIC      = "engine-events"
+_RECONNECT_DELAY = 10   # seconds to wait before reconnecting after a disconnect
 
 
 async def handle_message(event, producer):
@@ -58,14 +59,19 @@ async def run():
 
     producer = await get_producer()
 
-    await client.start()
-    print("[TELEGRAM] connected")
-
     @client.on(events.NewMessage)
     async def handler(event):
         await handle_message(event, producer)
 
-    await client.run_until_disconnected()
+    while True:
+        try:
+            await client.start()
+            print("[TELEGRAM] connected")
+            await client.run_until_disconnected()
+            print("[TELEGRAM] disconnected — reconnecting in %ds", _RECONNECT_DELAY)
+        except Exception as e:
+            print(f"[TELEGRAM] connection error: {e} — reconnecting in {_RECONNECT_DELAY}s")
+        await asyncio.sleep(_RECONNECT_DELAY)
 
 
 if __name__ == "__main__":

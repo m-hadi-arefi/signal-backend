@@ -139,7 +139,6 @@ class SignalEvaluator:
                            sr.entry_price,
                            sr.hit_tp        AS hit_tp_price,
                            sr.hit_tp_index,
-                           sr.price_history,
                            sr.evaluated_at,
                            sr.entered_at
                     FROM   scenarios sc
@@ -147,6 +146,18 @@ class SignalEvaluator:
                     WHERE  sc.status = 'running' AND sc.active = TRUE
                 """))
                 rows = result.mappings().all()
+
+                sc_ids = [r["id"] for r in rows]
+                price_points_by_sc: dict = {}
+                if sc_ids:
+                    pp_result = await session.execute(text("""
+                        SELECT scenario_id, recorded_at, price
+                        FROM   scenario_price_points
+                        WHERE  scenario_id = ANY(:ids)
+                        ORDER  BY scenario_id, recorded_at ASC
+                    """), {"ids": sc_ids})
+                    for pp in pp_result.mappings().all():
+                        price_points_by_sc.setdefault(pp["scenario_id"], []).append(pp)
         except Exception as e:
             log(SERVICE_NAME, "error", "-", "recovery: DB read failed", error=e)
             return
@@ -172,23 +183,24 @@ class SignalEvaluator:
             if sc["hit_tp_index"]:
                 pipe.set(f"eval:besttp_idx:{sc_id}", str(sc["hit_tp_index"]), ex=REDIS_TTL)
 
-            history = sc["price_history"] or []
+            price_points = price_points_by_sc.get(sc_id, [])
             last_hist_epoch: Optional[float] = None
 
-            if history:
-                prices = [h["price"] for h in history if isinstance(h, dict) and "price" in h]
-                if prices:
-                    pipe.set(f"eval:min:{sc_id}", str(min(prices)), ex=REDIS_TTL)
-                    pipe.set(f"eval:max:{sc_id}", str(max(prices)), ex=REDIS_TTL)
+            if price_points:
+                prices = [float(pp["price"]) for pp in price_points]
+                pipe.set(f"eval:min:{sc_id}", str(min(prices)), ex=REDIS_TTL)
+                pipe.set(f"eval:max:{sc_id}", str(max(prices)), ex=REDIS_TTL)
 
-                # Restore timer from the last recorded point in price_history
-                last_entry = history[-1] if history else None
-                if last_entry and isinstance(last_entry, dict):
-                    if last_ts := last_entry.get("ts"):
-                        try:
-                            last_hist_epoch = datetime.fromisoformat(last_ts).timestamp()
-                        except (ValueError, AttributeError):
-                            pass
+                # Restore timer from the last recorded point in scenario_price_points
+                last_pt = price_points[-1]
+                try:
+                    recorded_at = last_pt["recorded_at"]
+                    if hasattr(recorded_at, "timestamp"):
+                        last_hist_epoch = recorded_at.timestamp()
+                    else:
+                        last_hist_epoch = datetime.fromisoformat(str(recorded_at)).timestamp()
+                except (ValueError, AttributeError):
+                    pass
 
             if last_hist_epoch is None:
                 # No price history yet — use entered_at as the timer base so the

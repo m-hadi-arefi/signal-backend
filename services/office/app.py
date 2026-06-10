@@ -18,7 +18,10 @@ def create_app():
         template_folder=os.path.join(os.path.dirname(__file__), "templates"),
         static_folder=os.path.join(os.path.dirname(__file__), "static"),
     )
-    app.secret_key = os.getenv("FLASK_SECRET_KEY", "signal-admin-fallback-key-change-in-prod")
+    _secret = os.getenv("FLASK_SECRET_KEY")
+    if not _secret:
+        raise RuntimeError("Required environment variable 'FLASK_SECRET_KEY' is not set")
+    app.secret_key = _secret
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -235,7 +238,7 @@ def create_app():
                 bootstrap_servers=os.getenv("KAFKA_BROKER", "kafka:9092"),
                 value_serializer=lambda v: json.dumps(v, default=str).encode("utf-8"),
             )
-            producer.send("engine-events", event)
+            producer.send("engine-signals", event)
             producer.flush(timeout=10)
             producer.close()
             flash(f"پیام {record['trace_id'][:8]}... مجدداً ارسال شد", "success")

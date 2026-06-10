@@ -14,7 +14,7 @@ def _get_dsn():
     return (
         f"host={os.getenv('POSTGRES_HOST', 'postgres')} "
         f"port={os.getenv('POSTGRES_PORT', '5432')} "
-        f"dbname={os.getenv('POSTGRES_DB', 'events')} "
+        f"dbname={os.getenv('POSTGRES_DB', 'signals')} "
         f"user={os.getenv('POSTGRES_USER', 'postgres')} "
         f"password={os.getenv('POSTGRES_PASSWORD', 'postgres')}"
     )

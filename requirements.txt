@@ -1,5 +1,6 @@
 # Kafka
 kafka-python==2.2.15
+aiokafka==0.14.0
 
 # Redis
 redis==6.0.0
@@ -27,32 +28,20 @@ beautifulsoup4==4.13.4
 lxml==5.4.0
 feedparser==6.0.11
 
-# Optional async kafka (future)
-# aiokafka==0.12.0
-
 # ORM
-sqlalchemy>=2.0.0
+sqlalchemy==2.0.36
 
 # Migrations
-alembic>=1.13.0
-
-# async kafka
-aiokafka==0.14.0
-
-# Dev mode
-watchfiles==1.1.1
+alembic==1.14.1
 
 # OpenAI
 openai==2.36.0
 
-# http
+# HTTP async
 aiohttp==3.13.5
 
 # WebSocket (price_streamer)
 websockets==13.1
 
-# fuzzy
+# Fuzzy matching
 RapidFuzz==3.14.5
-
-# feed
-feedparser==6.0.11

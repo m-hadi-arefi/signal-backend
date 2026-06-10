@@ -32,8 +32,11 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        if username == os.getenv("ADMIN_USERNAME", "admin") and \
-           password == os.getenv("ADMIN_PASSWORD", "admin"):
+        _user = os.getenv("ADMIN_USERNAME")
+        _pass = os.getenv("ADMIN_PASSWORD")
+        if not _user or not _pass:
+            raise RuntimeError("ADMIN_USERNAME and ADMIN_PASSWORD environment variables must be set")
+        if username == _user and password == _pass:
             session.permanent = True
             login_user(AdminUser(), remember=True)
             next_url = request.args.get("next", "")

@@ -76,7 +76,7 @@ async def process_source(source: dict, producer, tracker: SeenTracker):
                     },
                 })
 
-                await producer.send_and_wait("engine-events", event)
+                await producer.send_and_wait("engine-signals", event)
                 tracker.mark_seen(url)
                 new_count += 1
 

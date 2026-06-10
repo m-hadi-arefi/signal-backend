@@ -16,7 +16,7 @@ class AIWorker(BaseWorker):
     def __init__(self):
         super().__init__(
             service_name="ai_worker",
-            topic="ai-events",
+            topic="ai-signals",
             group_id="ai-group"
         )
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))

@@ -1,19 +1,20 @@
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.8.0
-    ports:
-      - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_SERVER_ID: 1
       ZOOKEEPER_SERVERS: zookeeper:2888:3888
+      ZOOKEEPER_HEAP_OPTS: "-Xmx192m -Xms128m"
     networks:
-      - event-net
+      - signal-net
+    cpus: "0.3"
+    mem_limit: 320m
+    memswap_limit: 320m
+    restart: unless-stopped
 
   kafka:
     image: confluentinc/cp-kafka:7.8.0
-    ports:
-      - "9092:9092"
     depends_on:
       - zookeeper
     environment:
@@ -22,35 +23,16 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: "-Xmx576m -Xms256m"
     networks:
-      - event-net
+      - signal-net
+    cpus: "1"
+    mem_limit: 1024m
+    memswap_limit: 1024m
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
-
-  akhq:
-    image: tchiotludo/akhq:latest
-
-    ports:
-      - "8000:8080"
-
-    environment:
-      AKHQ_CONFIGURATION: |
-        akhq:
-          connections:
-            local:
-              properties:
-                bootstrap.servers: "kafka:9092"
-
-    depends_on:
-      - kafka
-    
-    networks:
-      - event-net
-
-networks:
-  event-net:
-    external: true
+      start_period: 20s
+    restart: unless-stopped

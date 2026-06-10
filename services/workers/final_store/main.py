@@ -7,7 +7,7 @@ Responsibilities:
        a. Snapshot the current market price from Redis (nullable — Redis miss ok).
        b. Create a Signal row + one Scenario row per AI scenario for that symbol.
   3. On validation failure: raise so BaseWorker dead-letters the event.
-  4. Return None — this is the last step, nothing is forwarded to engine-events.
+  4. Return None — this is the last step, nothing is forwarded to engine-signals.
 
 Structured logging format: JSON lines via core.logger.log().
 """
@@ -30,7 +30,7 @@ class FinalStoreWorker(BaseWorker):
     def __init__(self):
         super().__init__(
             service_name="final_store",
-            topic="final-events",
+            topic="final-signals",
             group_id="final-group",
         )
         self.redis = get_redis()
@@ -51,7 +51,7 @@ class FinalStoreWorker(BaseWorker):
                 "schema_validation_failed",
                 event={"validation_errors": exc.errors()},
             )
-            raise  # BaseWorker catches this and sends to dlq-events
+            raise  # BaseWorker catches this and sends to dlq-signals
 
         raw_signals = validated.signals
         if not raw_signals:
@@ -91,7 +91,7 @@ class FinalStoreWorker(BaseWorker):
                 await repo.rollback()
                 raise
 
-        return None  # final step — nothing forwarded to engine-events
+        return None  # final step — nothing forwarded to engine-signals
 
     # ------------------------------------------------------------------ #
     # Redis price fetch (blocking I/O — run in thread)                    #

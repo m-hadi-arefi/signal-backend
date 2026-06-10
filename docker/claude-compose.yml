@@ -1,23 +1,21 @@
 services:
   claude-gateway:
     build:
-      context: ./services/claude
+      context: ../services/claude
       dockerfile: Dockerfile
     container_name: claude-gateway
-    ports:
-      - "8009:8000"
     volumes:
-      - ./services/claude/app:/app
-      - ${USERPROFILE}/.claude:/root/.claude
+      - ../services/claude/app:/app
+      - ${CLAUDE_HOME}:/root/.claude
     networks:
-      - event-net
+      - signal-net
     restart: unless-stopped
+    cpus: "0.3"
+    mem_limit: 384m
+    memswap_limit: 384m
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-networks:
-  event-net:
-    external: true
+      start_period: 15s

@@ -20,7 +20,7 @@ class Engine(BaseWorker):
     def __init__(self):
         super().__init__(
             service_name="engine",
-            topic="engine-events",
+            topic="engine-signals",
             group_id="engine-group"
         )
 
@@ -32,7 +32,7 @@ class Engine(BaseWorker):
         step = next_step(pipeline, trace)
 
         if step:
-            topic = f"{step}-events"
+            topic = f"{step}-signals"
             log("engine", "info", trace_id, f"dispatching to {step}", event)
             # The engine routes to dynamic topics, so we send manually here
             await self.producer.send_and_wait(topic, event)

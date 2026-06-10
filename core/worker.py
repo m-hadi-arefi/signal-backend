@@ -95,7 +95,7 @@ class BaseWorker(abc.ABC):
                     await log_pipeline(trace_id, self.service_name, self._current_step_name(), "dropped", event)
             else:
                 await log_pipeline(trace_id, self.service_name, self._current_step_name(), "completed", result_event)
-                await self.producer.send_and_wait("engine-events", result_event)
+                await self.producer.send_and_wait("engine-signals", result_event)
 
             # Commit after success
             await safe_commit(self.consumer)

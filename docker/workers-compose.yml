@@ -1,9 +1,11 @@
 services:
   engine:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
-    command:  watchfiles 'python services/engine/main.py'
+    command: python services/engine/main.py
+    env_file:
+      - ../.env
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/worker_ready"]
       interval: 5s
@@ -17,15 +19,19 @@ services:
       postgres:
         condition: service_started
     networks:
-      - event-net
-    volumes:
-      - .:/app
+      - signal-net
+    restart: unless-stopped
+    cpus: "0.4"
+    mem_limit: 256m
+    memswap_limit: 256m
 
   ai-worker:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
-    command:  watchfiles 'python services/workers/ai_worker/main.py'
+    command: python services/workers/ai_worker/main.py
+    env_file:
+      - ../.env
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/worker_ready"]
       interval: 5s
@@ -39,15 +45,19 @@ services:
       postgres:
         condition: service_started
     networks:
-      - event-net
-    volumes:
-      - .:/app
+      - signal-net
+    restart: unless-stopped
+    cpus: "0.3"
+    mem_limit: 256m
+    memswap_limit: 256m
 
   final-store:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
-    command:  watchfiles 'python services/workers/final_store/main.py'
+    command: python services/workers/final_store/main.py
+    env_file:
+      - ../.env
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/worker_ready"]
       interval: 5s
@@ -61,9 +71,8 @@ services:
       postgres:
         condition: service_started
     networks:
-      - event-net
-    volumes:
-      - .:/app
-networks:
-  event-net:
-    external: true
+      - signal-net
+    restart: unless-stopped
+    cpus: "0.1"
+    mem_limit: 128m
+    memswap_limit: 128m

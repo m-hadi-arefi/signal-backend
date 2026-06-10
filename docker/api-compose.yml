@@ -1,22 +1,21 @@
 services:
-
   api:
     build:
-      context: ./services/api
+      context: ../services/api
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
+    env_file:
+      - ../.env
     environment:
       API_PORT: "8080"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: events
-      # Postgres max_connections=200, سایر سرویس‌ها ~55 connection
-      # 200 - 55 - 10(internal) = 135 → 100 برای API (buffer داره)
-      DB_MAX_CONNS: "100"
-      DB_MIN_CONNS: "20"
+      POSTGRES_DB: ${POSTGRES_DB:-signals}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_MAX_CONNS: "60"
+      DB_MIN_CONNS: "10"
       DB_MAX_CONN_LIFETIME: "30m"
       DB_MAX_CONN_IDLE_TIME: "5m"
       DB_HEALTH_CHECK_PERIOD: "30s"
@@ -30,18 +29,17 @@ services:
       CACHE_TTL: "30s"
       GOMAXPROCS: "2"
       RATE_LIMIT_RPS: "8000"
-      # 1500 concurrent goroutine:
-      # memory: 1500 × 250KB = 375MB + runtime 150MB = 525MB (safe در 1.5GB)
-      # CPU: goroutine‌ها I/O-bound هستن، 2 core کافیه
-      # DB: 99.8% cache hit → فقط ~3 goroutine همزمان به DB می‌رسه
-      MAX_CONCURRENT: "1500"
+      MAX_CONCURRENT: "1000"
+      MATOMO_URL: ${MATOMO_URL:-}
+      MATOMO_SITE_ID: ${MATOMO_SITE_ID:-1}
+      MATOMO_TOKEN: ${MATOMO_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
-      - event-net
+      - signal-net
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
@@ -49,15 +47,11 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
-    cpus: "2.0"
-    mem_limit: 1500m
-    memswap_limit: 1500m
+    cpus: "0.5"
+    mem_limit: 600m
+    memswap_limit: 600m
     sysctls:
       net.core.somaxconn: 65535
       net.ipv4.tcp_syncookies: 1
       net.ipv4.ip_local_port_range: "1024 65535"
       net.ipv4.tcp_tw_reuse: 1
-
-networks:
-  event-net:
-    external: true

@@ -41,6 +41,7 @@ import (
 	"signal/api/internal/handler"
 	"signal/api/internal/middleware"
 	"signal/api/internal/repository"
+	"signal/api/internal/tracking"
 )
 
 func main() {
@@ -68,6 +69,11 @@ func main() {
 	}
 	defer redisCache.Close()
 
+	matomo := tracking.NewMatomoClient(cfg.MatomoURL, cfg.MatomoSiteID, cfg.MatomoToken, cfg.MatomoEnabled)
+	if cfg.MatomoEnabled {
+		log.Printf("matomo tracking enabled → %s (site %s)", cfg.MatomoURL, cfg.MatomoSiteID)
+	}
+
 	app := fiber.New(fiber.Config{
 		JSONEncoder:               sonic.Marshal,
 		JSONDecoder:               sonic.Unmarshal,
@@ -89,6 +95,7 @@ func main() {
 	}))
 	app.Use(compress.New(compress.Config{Level: compress.LevelBestSpeed}))
 	app.Use(middleware.GlobalRateLimiter(cfg.RateLimitRPS, time.Second))
+	app.Use(middleware.MatomoTracker(matomo))
 
 	// ── Dependencies ──────────────────────────────────────────────────────────
 	healthHandler := handler.NewHealthHandler(pool, redisCache)

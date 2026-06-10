@@ -61,7 +61,7 @@ async def process_source(source: dict, producer, tracker: ApiTracker):
                     },
                 })
 
-                await producer.send_and_wait("engine-events", event)
+                await producer.send_and_wait("engine-signals", event)
                 tracker.mark_seen(name, item_id)
                 new_count += 1
 

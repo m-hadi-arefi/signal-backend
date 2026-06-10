@@ -20,7 +20,7 @@ class DLQProducer:
         }
 
         await self.producer.send_and_wait(
-            "dlq-events",
+            "dlq-signals",
             dlq_event
         )
 

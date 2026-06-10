@@ -1,9 +1,15 @@
 services:
   price-streamer:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
-    command: watchfiles 'python services/processors/price_streamer/main.py'
+    command: python services/processors/price_streamer/main.py
+    env_file:
+      - ../.env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SKIP_KAFKA: "true"
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/worker_ready"]
       interval: 5s
@@ -16,20 +22,22 @@ services:
       redis:
         condition: service_started
     networks:
-      - event-net
-    volumes:
-      - .:/app
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - PYTHONPATH=/app
-      - SKIP_KAFKA=true   # price-streamer reads from exchange WS, not Kafka
+      - signal-net
+    cpus: "0.2"
+    mem_limit: 192m
+    memswap_limit: 192m
 
   signal-evaluator:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
-    command: watchfiles 'python services/processors/signal_evaluator/main.py'
+    command: python services/processors/signal_evaluator/main.py
+    env_file:
+      - ../.env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SKIP_KAFKA: "true"
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/worker_ready"]
       interval: 5s
@@ -42,15 +50,7 @@ services:
       redis:
         condition: service_started
     networks:
-      - event-net
-    volumes:
-      - .:/app
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - PYTHONPATH=/app
-      - SKIP_KAFKA=true   # evaluator reads directly from DB + Redis, not Kafka
-
-networks:
-  event-net:
-    external: true
+      - signal-net
+    cpus: "0.2"
+    mem_limit: 192m
+    memswap_limit: 192m

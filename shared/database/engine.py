@@ -5,5 +5,9 @@ DATABASE_URL = f"postgresql+asyncpg://{settings.POSTGRES_USER}:{settings.POSTGRE
 
 engine = create_async_engine(
     DATABASE_URL,
-    pool_pre_ping=True
+    pool_size=20,
+    max_overflow=10,
+    pool_recycle=1800,
+    pool_pre_ping=True,
+    echo=False,
 )

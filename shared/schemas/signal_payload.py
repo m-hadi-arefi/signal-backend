@@ -2,7 +2,7 @@
 Final event payload schema — version 1.0
 
 Validates the Kafka event that arrives at the final_store worker.
-Events that fail validation are dead-lettered to dlq-events.
+Signals that fail validation are dead-lettered to dlq-signals.
 """
 from typing import List, Optional
 

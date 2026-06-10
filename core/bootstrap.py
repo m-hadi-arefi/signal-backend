@@ -3,10 +3,10 @@ from aiokafka.admin import AIOKafkaAdminClient
 from core.config import settings
 
 TOPICS = [
-    "engine-events",
-    "ai-events",
-    "final-events",
-    "dlq-events"
+    "engine-signals",
+    "ai-signals",
+    "final-signals",
+    "dlq-signals"
 ]
 
 

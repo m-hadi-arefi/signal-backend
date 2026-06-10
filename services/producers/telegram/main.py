@@ -9,7 +9,7 @@ from shared.enums.workflows import WORKFLOWS
 
 from services.producers.telegram.client import client, PHONE
 
-KAFKA_TOPIC      = "engine-events"
+KAFKA_TOPIC      = "engine-signals"
 _RECONNECT_DELAY = 10   # seconds to wait before reconnecting after a disconnect
 
 

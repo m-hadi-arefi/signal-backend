@@ -28,6 +28,12 @@ type Config struct {
 	// Backpressure controls
 	MaxConcurrent int // max in-flight requests hitting the DB layer
 	RateLimitRPS  int // max requests per second (global, in-memory)
+
+	// Matomo analytics
+	MatomoURL     string
+	MatomoSiteID  string
+	MatomoToken   string
+	MatomoEnabled bool
 }
 
 func Load() *Config {
@@ -51,6 +57,11 @@ func Load() *Config {
 
 		MaxConcurrent: getEnvInt("MAX_CONCURRENT", 300),
 		RateLimitRPS:  getEnvInt("RATE_LIMIT_RPS", 5000),
+
+		MatomoURL:     getEnv("MATOMO_URL", ""),
+		MatomoSiteID:  getEnv("MATOMO_SITE_ID", "1"),
+		MatomoToken:   getEnv("MATOMO_TOKEN", ""),
+		MatomoEnabled: getEnv("MATOMO_URL", "") != "",
 	}
 }
 

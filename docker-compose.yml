@@ -1,73 +1,72 @@
+include:
+  - docker/kafka-compose.yml
+  - docker/api-compose.yml
+  - docker/office-compose.yml
+  - docker/workers-compose.yml
+  - docker/producers-compose.yml
+  - docker/processors-compose.yml
+  - docker/claude-compose.yml
+
 services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: events
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-signals}
     networks:
-      - event-net
+      - signal-net
     volumes:
       - postgres_data:/var/lib/postgresql/data
     command: >
       postgres
-      -c max_connections=200
-      -c shared_buffers=512MB
-      -c effective_cache_size=1536MB
-      -c work_mem=4MB
-      -c maintenance_work_mem=128MB
+      -c max_connections=150
+      -c shared_buffers=256MB
+      -c effective_cache_size=512MB
+      -c work_mem=2MB
+      -c maintenance_work_mem=32MB
       -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
+      -c wal_buffers=8MB
       -c default_statistics_target=100
       -c random_page_cost=1.1
       -c effective_io_concurrency=200
-      -c min_wal_size=1GB
-      -c max_wal_size=4GB
-    # 2 CPU + 2GB RAM
-    # work_mem کاهش یافت: 8MB→4MB
-    # 200 conn × 4MB × 2 ops = 1.6GB worst-case (safe در 2GB)
-    # برای query ما (index scan + LIMIT) work_mem اصلاً استفاده نمیشه
-    cpus: "2.0"
-    mem_limit: 2g
-    memswap_limit: 2g
+      -c min_wal_size=256MB
+      -c max_wal_size=1GB
+    cpus: "1.0"
+    mem_limit: 1024m
+    memswap_limit: 1024m
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     networks:
-      - event-net
+      - signal-net
     command: >
       redis-server
-      --maxmemory 384mb
+      --maxmemory 256mb
       --maxmemory-policy allkeys-lru
-      --tcp-backlog 1024
+      --tcp-backlog 512
       --tcp-keepalive 60
-      --hz 20
+      --hz 15
       --io-threads 2
       --io-threads-do-reads yes
-    # CPU 0.5→1.0: io-threads=2 نیاز به CPU بیشتر داره
-    # RAM 384MB→512MB: maxmemory=384MB + OS overhead + connection buffers
-    # 200 client connection × 20KB = 4MB buffer
-    # io-threads=2: Redis 7 از multi-thread I/O پشتیبانی می‌کنه
-    cpus: "1.0"
-    mem_limit: 512m
-    memswap_limit: 512m
+    cpus: "0.5"
+    mem_limit: 384m
+    memswap_limit: 384m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
 
 networks:
-  event-net:
+  signal-net:
     driver: bridge
     driver_opts:
       com.docker.network.driver.mtu: "1500"

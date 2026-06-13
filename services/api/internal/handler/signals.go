@@ -33,8 +33,9 @@ func NewSignalHandler(repo *repository.SignalRepository) *SignalHandler {
 //	@Description	Paginated list of signals with scenarios, evaluation results and source info. raw_text is never returned.
 //	@Tags			signals
 //	@Produce		json
-//	@Param			page			query	int		false	"Page (1-based)"	default(1)
-//	@Param			limit			query	int		false	"Per page"			default(20)	maximum(200)
+//	@Param			page			query	int		false	"Page (1-based)"								default(1)
+//	@Param			limit			query	int		false	"Per page"										default(20)	maximum(200)
+//	@Param			status			query	string	false	"Comma-separated status filter, e.g. active,pending or expired,completed,cancelled. Omit for all."
 //	@Success		200	{object}	repository.SignalsPage
 //	@Failure		408	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
@@ -197,7 +198,17 @@ func (h *SignalHandler) parseParams(c *fiber.Ctx) repository.SignalListParams {
 	if page < 1 {
 		page = 1
 	}
-	return repository.SignalListParams{Page: page, Limit: limit}
+
+	var statuses []string
+	if raw := strings.TrimSpace(c.Query("status")); raw != "" {
+		for _, s := range strings.Split(raw, ",") {
+			if s = strings.TrimSpace(s); s != "" {
+				statuses = append(statuses, s)
+			}
+		}
+	}
+
+	return repository.SignalListParams{Page: page, Limit: limit, Statuses: statuses}
 }
 
 func (h *SignalHandler) dbError(c *fiber.Ctx, err error) error {

@@ -29,7 +29,7 @@ class FinalStoreWorker(BaseWorker):
 
     def __init__(self):
         super().__init__(
-            service_name="final_store",
+            service_name="final-store",
             topic="final-signals",
             group_id="final-group",
         )

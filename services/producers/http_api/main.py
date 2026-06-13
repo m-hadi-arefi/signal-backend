@@ -1,6 +1,7 @@
 import asyncio
 
 from core.kafka_client import get_producer
+from core.heartbeat import heartbeat_loop
 from core.trace import ensure_trace
 from core.text import clean_text
 from services.producers.http_api.fetcher import fetch
@@ -87,6 +88,7 @@ async def run():
     print("[HTTP_API] started")
     producer = await get_producer()
     tracker  = ApiTracker()
+    asyncio.create_task(heartbeat_loop("http-api-producer"))
 
     try:
         while True:

@@ -16,7 +16,7 @@ _HEARTBEAT_INTERVAL = 10   # seconds
 _HEARTBEAT_TTL      = 30   # Redis key TTL (seconds)
 
 # Services that return None from process_event as a normal "completed" signal
-_NONE_MEANS_COMPLETED = {"engine", "final_store"}
+_NONE_MEANS_COMPLETED = {"engine", "final-store"}
 
 # Sentinel file for Docker healthchecks
 HEALTHCHECK_FILE = "/tmp/worker_ready"
@@ -66,8 +66,8 @@ class BaseWorker(abc.ABC):
     def _current_step_name(self) -> str:
         mapping = {
             "engine": "engine",
-            "ai_worker": "ai",
-            "final_store": "final",
+            "ai-worker": "ai",
+            "final-store": "final",
         }
         return mapping.get(self.service_name, self.service_name)
 

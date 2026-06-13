@@ -1,10 +1,12 @@
 import asyncio
 import re
 import feedparser
+from services.producers.scraper.fetcher import fetch_async
 
 
 async def fetch_rss_entries(source: dict) -> list:
-    feed = await asyncio.to_thread(feedparser.parse, source["rss"])
+    raw = await fetch_async(source["rss"])
+    feed = await asyncio.to_thread(feedparser.parse, raw)
     filter_cfg = source.get("filter")
     result = []
 

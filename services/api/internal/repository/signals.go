@@ -114,6 +114,7 @@ type SignalListParams struct {
 	Limit       int
 	Symbol      string
 	SrcProvider string
+	Statuses    []string // nil = all; e.g. ["active","pending"] or ["expired","completed","cancelled"]
 }
 
 // ─── Repository ───────────────────────────────────────────────────────────────
@@ -211,13 +212,27 @@ func (r *SignalRepository) querySignals(
 	condArgs []any,
 	p SignalListParams,
 ) (*SignalsPage, error) {
-	where := ""
+	wheres := []string{}
 	if cond != "" {
-		where = "WHERE " + cond
+		wheres = append(wheres, cond)
 	}
 
+	args := make([]any, len(condArgs))
+	copy(args, condArgs)
 	n := len(condArgs) + 1
-	args := append(condArgs, p.Limit, (p.Page-1)*p.Limit)
+
+	if len(p.Statuses) > 0 {
+		wheres = append(wheres, fmt.Sprintf("s.status = ANY($%d)", n))
+		args = append(args, p.Statuses)
+		n++
+	}
+
+	where := ""
+	if len(wheres) > 0 {
+		where = "WHERE " + strings.Join(wheres, " AND ")
+	}
+
+	args = append(args, p.Limit, (p.Page-1)*p.Limit)
 
 	query := fmt.Sprintf(`
 		SELECT

@@ -3,6 +3,7 @@ import asyncio
 from telethon import TelegramClient, events
 
 from core.kafka_client import get_producer
+from core.heartbeat import heartbeat_loop
 from core.trace import ensure_trace
 from core.text import clean_text
 from shared.enums.workflows import WORKFLOWS
@@ -58,6 +59,7 @@ async def run():
     print("[TELEGRAM] starting producer...")
 
     producer = await get_producer()
+    asyncio.create_task(heartbeat_loop("telegram-producer"))
 
     @client.on(events.NewMessage)
     async def handler(event):

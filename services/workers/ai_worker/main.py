@@ -15,7 +15,7 @@ _TRACKED_COINS_TTL = 300  # reload from DB every 5 minutes
 class AIWorker(BaseWorker):
     def __init__(self):
         super().__init__(
-            service_name="ai_worker",
+            service_name="ai-worker",
             topic="ai-signals",
             group_id="ai-group"
         )

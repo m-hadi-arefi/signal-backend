@@ -1,6 +1,7 @@
 import asyncio
 
 from core.kafka_client import get_producer, KafkaProducerSingleton
+from core.heartbeat import heartbeat_loop
 from core.trace import ensure_trace
 from core.text import clean_text
 from services.producers.scraper.detector import extract_post_links
@@ -102,6 +103,7 @@ async def run():
     print("[SCRAPER] started")
     producer = await get_producer()
     tracker  = SeenTracker()
+    asyncio.create_task(heartbeat_loop("scraper-producer"))
 
     try:
         while True:
